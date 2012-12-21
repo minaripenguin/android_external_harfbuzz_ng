@@ -55,8 +55,9 @@ RS   = 13;
 Coeng = 14;
 Repha = 15;
 Ra    = 16;
+CM    = 17;
 
-c = (C | Ra);			# is_consonant
+c = (C | Ra)CM*;		# is_consonant
 n = ((ZWNJ?.RS)? (N.N?)?);	# is_consonant_modifier
 z = ZWJ|ZWNJ;			# is_joiner
 h = H | Coeng;			# is_halant_or_coeng
@@ -102,7 +103,7 @@ main := |*
 static void
 find_syllables (hb_buffer_t *buffer)
 {
-  unsigned int p, pe, eof, ts, te, act;
+  unsigned int p, pe, eof, ts HB_UNUSED, te, act;
   int cs;
   hb_glyph_info_t *info = buffer->info;
   %%{

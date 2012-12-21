@@ -1,6 +1,6 @@
 AC_PREREQ([2.64])
 AC_INIT([HarfBuzz],
-        [0.9.5],
+        [0.9.9],
         [http://bugs.freedesktop.org/enter_bug.cgi?product=harfbuzz],
         [harfbuzz],
         [http://harfbuzz.org/])
@@ -208,7 +208,19 @@ AM_CONDITIONAL(HAVE_FREETYPE, $have_freetype)
 
 dnl ===========================================================================
 
-AC_CHECK_HEADERS(usp10.h windows.h, have_uniscribe=true, have_uniscribe=false)
+AC_MSG_CHECKING([for ScriptShapeOpenType in usp10])
+saved_LIBS=$LIBS
+LIBS="$LIBS -lusp10 -lgdi32"
+AC_LINK_IFELSE([AC_LANG_PROGRAM(
+	[[
+	 #define _WIN32_WINNT 0x0600
+	 #include <windows.h>
+	 #include <usp10.h>
+	 ]],
+	ScriptShapeOpenType)],
+	[have_uniscribe=true; AC_MSG_RESULT(yes)],
+	[have_uniscribe=false;AC_MSG_RESULT(no)])
+LIBS=$saved_LIBS
 if $have_uniscribe; then
 	UNISCRIBE_CFLAGS=
 	UNISCRIBE_LIBS="-lusp10 -lgdi32"
@@ -220,7 +232,7 @@ AM_CONDITIONAL(HAVE_UNISCRIBE, $have_uniscribe)
 
 dnl ===========================================================================
 
-AC_CHECK_HEADERS(ApplicationServices/ApplicationServices.h, have_coretext=true, have_coretext=false)
+AC_CHECK_TYPE(CTFontRef, have_coretext=true, have_coretext=false, [#include <ApplicationServices/ApplicationServices.h>])
 if $have_coretext; then
 	CORETEXT_CFLAGS=
 	CORETEXT_LIBS="-framework ApplicationServices"
@@ -263,3 +275,28 @@ test/shaping/Makefile
 ])
 
 AC_OUTPUT
+
+AC_MSG_NOTICE([
+
+Build configuration:
+
+Unicode callbacks (you want at least one):
+	Glib:			${have_glib}
+	ICU:			${have_icu}
+	UCDN:			${have_ucdn}
+
+Font callbacks (the more the better):
+	FreeType:		${have_freetype}
+
+Tools used for command-line utilities:
+	Cairo:			${have_cairo}
+
+Additional shapers (the more the better):
+	Graphite2:		${have_graphite}
+
+Test / platform shapers (not normally needed):
+	CoreText:		${have_coretext}
+	ICU Layout Engine:	${have_icu_le}
+	Old HarfBuzz:		${have_hb_old}
+	Uniscribe:		${have_uniscribe}
+])
