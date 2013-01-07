@@ -44,11 +44,12 @@ LOCAL_SRC_FILES:= \
 	src/hb-ot-map.cc \
 	src/hb-ot-shape.cc \
 	src/hb-ot-shape-complex-arabic.cc \
+	src/hb-ot-shape-complex-default.cc \
 	src/hb-ot-shape-complex-indic.cc \
-	src/hb-ot-shape-complex-misc.cc \
+	src/hb-ot-shape-complex-thai.cc \
 	src/hb-ot-shape-normalize.cc \
 	src/hb-ot-shape-fallback.cc \
-	src/hb-icu.cc 
+	src/hb-icu.cc
 
 LOCAL_CPP_EXTENSION := .cc
 
