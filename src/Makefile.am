@@ -43,7 +43,6 @@ HBSOURCES =  \
 	hb-shape.cc \
 	hb-shape-plan-private.hh \
 	hb-shape-plan.cc \
-	hb-shape-plan.h \
 	hb-shaper-list.hh \
 	hb-shaper-impl-private.hh \
 	hb-shaper-private.hh \
@@ -62,6 +61,7 @@ HBHEADERS = \
 	hb-font.h \
 	hb-set.h \
 	hb-shape.h \
+	hb-shape-plan.h \
 	hb-unicode.h \
 	hb-version.h \
 	$(NULL)
@@ -81,11 +81,12 @@ HBSOURCES += \
 	hb-ot-shape-complex-arabic.cc \
 	hb-ot-shape-complex-arabic-fallback.hh \
 	hb-ot-shape-complex-arabic-table.hh \
+	hb-ot-shape-complex-default.cc \
 	hb-ot-shape-complex-indic.cc \
 	hb-ot-shape-complex-indic-machine.hh \
 	hb-ot-shape-complex-indic-private.hh \
 	hb-ot-shape-complex-indic-table.hh \
-	hb-ot-shape-complex-misc.cc \
+	hb-ot-shape-complex-thai.cc \
 	hb-ot-shape-complex-private.hh \
 	hb-ot-shape-normalize-private.hh \
 	hb-ot-shape-normalize.cc \
@@ -194,8 +195,12 @@ export_symbols = -export-symbols harfbuzz.def
 harfbuzz_def_dependency = harfbuzz.def
 libharfbuzz_la_LINK = $(CXXLINK) $(libharfbuzz_la_LDFLAGS)
 else
+if HAVE_ICU
+libharfbuzz_la_LINK = $(CXXLINK) $(libharfbuzz_la_LDFLAGS)
+else
 # Use a C linker, not C++; Don't link to libstdc++
 libharfbuzz_la_LINK = $(LINK) $(libharfbuzz_la_LDFLAGS)
+endif
 endif
 
 libharfbuzz_la_SOURCES = $(HBSOURCES) $(HBHEADERS)
@@ -242,20 +247,28 @@ arabic-table: gen-arabic-table.py ArabicShaping.txt UnicodeData.txt
 .PHONY: unicode-tables arabic-table indic-table
 
 EXTRA_DIST += hb-ot-shape-complex-indic-machine.rl
-hb-ot-shape-complex-indic-machine.hh: hb-ot-shape-complex-indic-machine.rl
+$(srcdir)/hb-ot-shape-complex-indic-machine.hh: hb-ot-shape-complex-indic-machine.rl
 	$(AM_V_GEN)$(top_srcdir)/missing --run ragel -e -F1 -o "$@.tmp" "$<" && \
 	mv "$@.tmp" "$@" || ( $(RM) "$@.tmp" && false )
 
-noinst_PROGRAMS = main test-would-substitute
+noinst_PROGRAMS = main test test-would-substitute test-size-params
 bin_PROGRAMS =
 
 main_SOURCES = main.cc
 main_CPPFLAGS = $(HBCFLAGS)
 main_LDADD = libharfbuzz.la $(HBLIBS)
 
+test_SOURCES = test.cc
+test_CPPFLAGS = $(HBCFLAGS) $(FREETYPE_CFLAGS)
+test_LDADD = libharfbuzz.la $(HBLIBS) $(FREETYPE_LIBS)
+
 test_would_substitute_SOURCES = test-would-substitute.cc
 test_would_substitute_CPPFLAGS = $(HBCFLAGS) $(FREETYPE_CFLAGS)
 test_would_substitute_LDADD = libharfbuzz.la $(HBLIBS) $(FREETYPE_LIBS)
+
+test_size_params_SOURCES = test-size-params.cc
+test_size_params_CPPFLAGS = $(HBCFLAGS)
+test_size_params_LDADD = libharfbuzz.la $(HBLIBS)
 
 dist_check_SCRIPTS = \
 	check-c-linkage-decls.sh \
