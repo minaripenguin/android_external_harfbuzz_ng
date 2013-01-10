@@ -71,9 +71,7 @@ API additions
 hb-view / hb-shape enhancements:
 ===============================
 
-- --output-format should list available formats.
 - Add --width, --height, --auto-size, --align, etc?
-- --features="init=medi=isol=fina=0"
 
 
 Tests to write:
@@ -86,8 +84,6 @@ Tests to write:
 - Finish test-unicode.c, grep for TODO
 
 - GObject, FreeType, etc
-
-- hb_set_t
 
 - hb_cache_t and relatives
 
