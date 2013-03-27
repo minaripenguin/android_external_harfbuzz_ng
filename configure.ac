@@ -1,6 +1,6 @@
 AC_PREREQ([2.64])
 AC_INIT([HarfBuzz],
-        [0.9.10],
+        [0.9.14],
         [http://bugs.freedesktop.org/enter_bug.cgi?product=harfbuzz],
         [harfbuzz],
         [http://harfbuzz.org/])
@@ -9,10 +9,11 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([harfbuzz.pc.in])
 AC_CONFIG_HEADERS([config.h])
 
-AM_INIT_AUTOMAKE([1.11.1 gnits dist-bzip2 no-dist-gzip -Wall no-define])
+AM_INIT_AUTOMAKE([1.11.1 gnits dist-bzip2 no-dist-gzip -Wall no-define color-tests])
 AM_SILENT_RULES([yes])
 
 # Initialize libtool
+AM_PROG_AR
 LT_PREREQ([2.2])
 LT_INIT([disable-static])
 
@@ -55,8 +56,8 @@ dnl GOBJECT_INTROSPECTION_CHECK([0.9.0])
 dnl GTK_DOC_CHECK([1.15],[--flavour no-tmpl])
 
 # Functions and headers
-AC_CHECK_FUNCS(atexit mprotect sysconf getpagesize sched_yield mmap _setmode isatty)
-AC_CHECK_HEADERS(unistd.h sys/mman.h sched.h io.h)
+AC_CHECK_FUNCS(atexit mprotect sysconf getpagesize mmap isatty)
+AC_CHECK_HEADERS(unistd.h sys/mman.h)
 
 # Compiler flags
 AC_CANONICAL_HOST
@@ -87,6 +88,8 @@ if test "x$GCC" = "xyes"; then
 		;;
 	esac
 fi
+
+AM_CONDITIONAL(HAVE_GCC, test "x$GCC" = "xyes")
 
 hb_os_win32=no
 AC_MSG_CHECKING([for native Win32])
@@ -170,7 +173,27 @@ AM_CONDITIONAL(HAVE_CAIRO_FT, $have_cairo_ft)
 dnl ==========================================================================
 
 PKG_CHECK_MODULES(ICU, icu-uc, have_icu=true, have_icu=false)
+dnl Fallback to icu-config if ICU pkg-config files could not be found
+if test "$have_icu" != "true"; then
+	AC_PATH_PROG(icu_config, icu-config, no)
+	AC_MSG_CHECKING([for ICU by using icu-config fallback])
+	if test "$icu_config" != "no" && "$icu_config" --version >/dev/null; then
+		have_icu=true
+		# We don't use --cflags as this gives us a lot of things that we don't
+		# necessarily want, like debugging and optimization flags
+		# See man (1) icu-config for more info.
+		ICU_CFLAGS=`$icu_config --cppflags`
+		ICU_LIBS=`$icu_config --ldflags-libsonly`
+		AC_SUBST(ICU_CFLAGS)
+		AC_SUBST(ICU_LIBS)
+		AC_MSG_RESULT([yes])
+	else
+		AC_MSG_RESULT([no])
+	fi
+fi
+
 if $have_icu; then
+	CXXFLAGS="$CXXFLAGS `$PKG_CONFIG --variable=CXXFLAGS icu-uc`"
 	AC_DEFINE(HAVE_ICU, 1, [Have ICU library])
 fi
 AM_CONDITIONAL(HAVE_ICU, $have_icu)
@@ -178,6 +201,24 @@ AM_CONDITIONAL(HAVE_ICU, $have_icu)
 dnl ==========================================================================
 
 PKG_CHECK_MODULES(ICU_LE, icu-le icu-uc, have_icu_le=true, have_icu_le=false)
+dnl Fallback to icu-config if ICU pkg-config files could not be found
+if test "$have_icu_le" != "true"; then
+	AC_PATH_PROG(icu_config, icu-config, no)
+	AC_MSG_CHECKING([for ICU_LE by using icu-config fallback])
+	if test "$icu_config" != "no" && "$icu_config" --version >/dev/null; then
+		have_icu_le=true
+		# We don't use --cflags as this gives us a lot of things that we don't
+		# necessarily want, like debugging and optimization flags
+		# See man (1) icu-config for more info.
+		ICU_LE_CFLAGS=`$icu_config --cppflags`
+		ICU_LE_LIBS=`$icu_config --ldflags-libsonly --ldflags-layout`
+		AC_SUBST(ICU_LE_CFLAGS)
+		AC_SUBST(ICU_LE_LIBS)
+		AC_MSG_RESULT([yes])
+	else
+		AC_MSG_RESULT([no])
+	fi
+fi
 if $have_icu_le; then
 	AC_DEFINE(HAVE_ICU_LE, 1, [Have ICU Layout Engine library])
 fi
@@ -256,6 +297,29 @@ AC_CACHE_CHECK([for Intel atomic primitives], hb_cv_have_intel_atomic_primitives
 ])
 if $hb_cv_have_intel_atomic_primitives; then
 	AC_DEFINE(HAVE_INTEL_ATOMIC_PRIMITIVES, 1, [Have Intel __sync_* atomic primitives])
+fi
+
+dnl ===========================================================================
+
+AC_CACHE_CHECK([for Solaris atomic operations], hb_cv_have_solaris_atomic_ops, [
+	hb_cv_have_solaris_atomic_ops=false
+	AC_TRY_LINK([
+		#include <atomic.h>
+		/* This requires Solaris Studio 12.2 or newer: */
+		#include <mbarrier.h>
+		void memory_barrier (void) { __machine_rw_barrier (); }
+		int atomic_add (volatile unsigned *i) { return atomic_add_int_nv (i, 1); }
+		void *atomic_ptr_cmpxchg (volatile void **target, void *cmp, void *newval) { return atomic_cas_ptr (target, cmp, newval); }
+		], [], hb_cv_have_solaris_atomic_ops=true
+	)
+])
+if $hb_cv_have_solaris_atomic_ops; then
+	AC_DEFINE(HAVE_SOLARIS_ATOMIC_OPS, 1, [Have Solaris __machine_*_barrier and atomic_* operations])
+fi
+
+if test "$os_win32" = no && ! $have_pthread; then
+	AC_CHECK_HEADERS(sched.h)
+	AC_SEARCH_LIBS(sched_yield,rt,AC_DEFINE(HAVE_SCHED_YIELD, 1, [Have sched_yield]))
 fi
 
 dnl ===========================================================================
