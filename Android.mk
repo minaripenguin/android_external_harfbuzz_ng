@@ -70,8 +70,6 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_CFLAGS += -DHB_NO_MT -DHAVE_OT -DHAVE_ICU
 
-LOCAL_LDLIBS += -lpthread
-
 LOCAL_MODULE:= libharfbuzz_ng
 
 include $(BUILD_SHARED_LIBRARY)
