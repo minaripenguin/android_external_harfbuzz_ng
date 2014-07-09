@@ -66,7 +66,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_C_INCLUDES += \
         $(LOCAL_PATH)/src \
-        external/icu4c/common
+        external/icu/icu4c/source/common
 
 LOCAL_CFLAGS += -DHB_NO_MT -DHAVE_OT -DHAVE_ICU
 
