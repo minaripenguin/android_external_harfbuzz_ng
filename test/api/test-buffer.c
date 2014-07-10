@@ -110,7 +110,7 @@ test_buffer_properties (fixture_t *fixture, gconstpointer user_data)
   g_assert (hb_buffer_get_direction (b) == HB_DIRECTION_INVALID);
   g_assert (hb_buffer_get_script (b) == HB_SCRIPT_INVALID);
   g_assert (hb_buffer_get_language (b) == NULL);
-  g_assert (hb_buffer_get_flags (b) == HB_BUFFER_FLAGS_DEFAULT);
+  g_assert (hb_buffer_get_flags (b) == HB_BUFFER_FLAG_DEFAULT);
 
 
   /* test property changes are retained */
@@ -704,7 +704,7 @@ static const utf16_conversion_test_t utf16_conversion_tests[] = {
   {{0x41, 0xD800, 0xDF02}, {-1}},
   {{0x41, 0x61, 0xD800, 0xDF02}, {0x61, -1}},
   {{0x41, 0xD800, 0x61, 0xDF02}, {-1, 0x61}},
-  {{0x41, 0x61}, {}}
+  {{0x41, 0x61}, {0}}
 };
 
 static void

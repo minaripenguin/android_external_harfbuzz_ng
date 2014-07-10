@@ -34,7 +34,29 @@
 
 HB_BEGIN_HEADER
 
-#include <stdint.h>
+#if !defined (HB_DONT_DEFINE_STDINT)
+
+#if defined (_SVR4) || defined (SVR4) || defined (__OpenBSD__) || \
+    defined (_sgi) || defined (__sun) || defined (sun) || \
+    defined (__digital__) || defined (__HP_cc)
+#  include <inttypes.h>
+#elif defined (_AIX)
+#  include <sys/inttypes.h>
+/* VS 2010 (_MSC_VER 1600) has stdint.h */
+#elif defined (_MSC_VER) && _MSC_VER < 1600
+typedef __int8 int8_t;
+typedef unsigned __int8 uint8_t;
+typedef __int16 int16_t;
+typedef unsigned __int16 uint16_t;
+typedef __int32 int32_t;
+typedef unsigned __int32 uint32_t;
+typedef __int64 int64_t;
+typedef unsigned __int64 uint64_t;
+#else
+#  include <stdint.h>
+#endif
+
+#endif
 
 #define UCDN_EAST_ASIAN_F 0
 #define UCDN_EAST_ASIAN_H 1
@@ -146,6 +168,29 @@ HB_BEGIN_HEADER
 #define UCDN_SCRIPT_SORA_SOMPENG 100
 #define UCDN_SCRIPT_TAKRI 101
 #define UCDN_SCRIPT_UNKNOWN 102
+#define UCDN_SCRIPT_BASSA_VAH 103
+#define UCDN_SCRIPT_CAUCASIAN_ALBANIAN 104
+#define UCDN_SCRIPT_DUPLOYAN 105
+#define UCDN_SCRIPT_ELBASAN 106
+#define UCDN_SCRIPT_GRANTHA 107
+#define UCDN_SCRIPT_KHOJKI 108
+#define UCDN_SCRIPT_KHUDAWADI 109
+#define UCDN_SCRIPT_LINEAR_A 110
+#define UCDN_SCRIPT_MAHAJANI 111
+#define UCDN_SCRIPT_MANICHAEAN 112
+#define UCDN_SCRIPT_MENDE_KIKAKUI 113
+#define UCDN_SCRIPT_MODI 114
+#define UCDN_SCRIPT_MRO 115
+#define UCDN_SCRIPT_NABATAEAN 116
+#define UCDN_SCRIPT_OLD_NORTH_ARABIAN 117
+#define UCDN_SCRIPT_OLD_PERMIC 118
+#define UCDN_SCRIPT_PAHAWH_HMONG 119
+#define UCDN_SCRIPT_PALMYRENE 120
+#define UCDN_SCRIPT_PAU_CIN_HAU 121
+#define UCDN_SCRIPT_PSALTER_PAHLAVI 122
+#define UCDN_SCRIPT_SIDDHAM 123
+#define UCDN_SCRIPT_TIRHUTA 124
+#define UCDN_SCRIPT_WARANG_CITI 125
 
 #define UCDN_GENERAL_CATEGORY_CC 0
 #define UCDN_GENERAL_CATEGORY_CF 1
@@ -197,6 +242,10 @@ HB_BEGIN_HEADER
 #define UCDN_BIDI_CLASS_S 16
 #define UCDN_BIDI_CLASS_WS 17
 #define UCDN_BIDI_CLASS_ON 18
+#define UCDN_BIDI_CLASS_LRI 19
+#define UCDN_BIDI_CLASS_RLI 20
+#define UCDN_BIDI_CLASS_FSI 21
+#define UCDN_BIDI_CLASS_PDI 22
 
 /**
  * Return version of the Unicode database.

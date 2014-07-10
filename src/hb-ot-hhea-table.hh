@@ -42,14 +42,14 @@ namespace OT {
 
 struct hhea
 {
-  static const hb_tag_t Tag	= HB_OT_TAG_hhea;
+  static const hb_tag_t tableTag	= HB_OT_TAG_hhea;
 
   inline bool sanitize (hb_sanitize_context_t *c) {
     TRACE_SANITIZE (this);
     return TRACE_RETURN (c->check_struct (this) && likely (version.major == 1));
   }
 
-  protected:
+  public:
   FixedVersion	version;		/* 0x00010000 for version 1.0. */
   FWORD		ascender;		/* Typographic ascent. <a
 					 * href="http://developer.apple.com/fonts/TTRefMan/RM06/Chap6hhea.html">

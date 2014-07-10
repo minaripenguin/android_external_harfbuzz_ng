@@ -54,14 +54,37 @@
 #include <glib.h>
 #include <glib/gprintf.h>
 
+#if !GLIB_CHECK_VERSION (2, 22, 0)
+# define g_mapped_file_unref g_mapped_file_free
+#endif
+
+
+/* A few macros copied from hb-private.hh. */
+
+#if __GNUC__ >= 4
+#define HB_UNUSED	__attribute__((unused))
+#else
+#define HB_UNUSED
+#endif
+
 #undef MIN
 template <typename Type> static inline Type MIN (const Type &a, const Type &b) { return a < b ? a : b; }
 
 #undef MAX
 template <typename Type> static inline Type MAX (const Type &a, const Type &b) { return a > b ? a : b; }
 
+#undef  ARRAY_LENGTH
+template <typename Type, unsigned int n>
+static inline unsigned int ARRAY_LENGTH (const Type (&)[n]) { return n; }
+/* A const version, but does not detect erratically being called on pointers. */
+#define ARRAY_LENGTH_CONST(__array) ((signed int) (sizeof (__array) / sizeof (__array[0])))
 
-void fail (hb_bool_t suggest_help, const char *format, ...) G_GNUC_NORETURN;
+#define _ASSERT_STATIC1(_line, _cond)	HB_UNUSED typedef int _static_assert_on_line_##_line##_failed[(_cond)?1:-1]
+#define _ASSERT_STATIC0(_line, _cond)	_ASSERT_STATIC1 (_line, (_cond))
+#define ASSERT_STATIC(_cond)		_ASSERT_STATIC0 (__LINE__, (_cond))
+
+
+void fail (hb_bool_t suggest_help, const char *format, ...) G_GNUC_NORETURN G_GNUC_PRINTF (2, 3);
 
 
 extern hb_bool_t debug;
@@ -81,11 +104,14 @@ struct option_parser_t
     memset (this, 0, sizeof (*this));
     usage_str = usage;
     context = g_option_context_new (usage);
+    to_free = g_ptr_array_new ();
 
     add_main_options ();
   }
   ~option_parser_t (void) {
     g_option_context_free (context);
+    g_ptr_array_foreach (to_free, (GFunc) g_free, NULL);
+    g_ptr_array_free (to_free, TRUE);
   }
 
   void add_main_options (void);
@@ -96,6 +122,10 @@ struct option_parser_t
 		  const gchar    *help_description,
 		  option_group_t *option_group);
 
+  void free_later (char *p) {
+    g_ptr_array_add (to_free, p);
+  }
+
   void parse (int *argc, char ***argv);
 
   G_GNUC_NORETURN void usage (void) {
@@ -103,8 +133,10 @@ struct option_parser_t
     exit (1);
   }
 
+  private:
   const char *usage_str;
   GOptionContext *context;
+  GPtrArray *to_free;
 };
 
 
@@ -150,6 +182,7 @@ struct shape_options_t : option_group_t
     shapers = NULL;
     utf8_clusters = false;
     normalize_glyphs = false;
+    num_iterations = 1;
 
     add_options (parser);
   }
@@ -166,7 +199,7 @@ struct shape_options_t : option_group_t
     hb_buffer_set_direction (buffer, hb_direction_from_string (direction, -1));
     hb_buffer_set_script (buffer, hb_script_from_string (script, -1));
     hb_buffer_set_language (buffer, hb_language_from_string (language, -1));
-    hb_buffer_set_flags (buffer, (hb_buffer_flags_t) (HB_BUFFER_FLAGS_DEFAULT |
+    hb_buffer_set_flags (buffer, (hb_buffer_flags_t) (HB_BUFFER_FLAG_DEFAULT |
 			 (bot ? HB_BUFFER_FLAG_BOT : 0) |
 			 (eot ? HB_BUFFER_FLAG_EOT : 0) |
 			 (preserve_default_ignorables ? HB_BUFFER_FLAG_PRESERVE_DEFAULT_IGNORABLES : 0)));
@@ -234,6 +267,7 @@ struct shape_options_t : option_group_t
   char **shapers;
   hb_bool_t utf8_clusters;
   hb_bool_t normalize_glyphs;
+  unsigned int num_iterations;
 };
 
 
@@ -242,6 +276,7 @@ struct font_options_t : option_group_t
   font_options_t (option_parser_t *parser) {
     font_file = NULL;
     face_index = 0;
+    font_funcs = NULL;
 
     font = NULL;
 
@@ -257,6 +292,7 @@ struct font_options_t : option_group_t
 
   const char *font_file;
   int face_index;
+  const char *font_funcs;
 
   private:
   mutable hb_font_t *font;
@@ -312,7 +348,7 @@ struct text_options_t : option_group_t
 struct output_options_t : option_group_t
 {
   output_options_t (option_parser_t *parser,
-		    const char *supported_formats_ = NULL) {
+		    const char **supported_formats_ = NULL) {
     output_file = NULL;
     output_format = NULL;
     supported_formats = supported_formats_;
@@ -348,7 +384,7 @@ struct output_options_t : option_group_t
 
   const char *output_file;
   const char *output_format;
-  const char *supported_formats;
+  const char **supported_formats;
   bool explicit_output_format;
 
   mutable FILE *fp;
