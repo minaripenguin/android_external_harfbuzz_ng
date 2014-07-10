@@ -16,7 +16,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include "ucdn.h"
 
 typedef struct {
@@ -34,7 +33,7 @@ typedef struct {
 } MirrorPair;
 
 typedef struct {
-    int start;
+    unsigned int start;
     short count, index;
 } Reindex;
 

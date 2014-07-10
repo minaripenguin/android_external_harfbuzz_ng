@@ -5,8 +5,6 @@ General fixes:
 
 - Return "safe-to-break" bit from shaping.
 
-- Disable 'vert' if 'vrt2' is available (eg. Motoya fonts with arrow chars).
-
 - Implement 'rand' feature.
 
 - mask propagation? (when ligation, "or" the masks).
@@ -23,19 +21,17 @@ General fixes:
 API issues to fix before 1.0:
 ============================
 
-- API to accept a list of languages.
-
-- Add default font_funcs / Unicode funcs API and to utils.
+- API to accept a list of languages?
 
 - Add init_func to font_funcs.  Adjust ft.
 
-- Add pkg-config files for glue codes (harfbuzz-glib, etc)
+- hb-ft load_flags issues.
 
-- Figure out how many .so objects, how to link, etc
+- Add pkg-config files for glue codes (harfbuzz-glib, etc)
 
 - 'const' for getter APIs? (use mutable internally)
 
-- blob_from_file?
+- Remove hb_ot_shape_glyphs_closure()?
 
 
 API additions
@@ -43,19 +39,17 @@ API additions
 
 - Language to/from script.
 
-- Buffer (de)serialize API ala hb-shape?
+- blob_from_file?
 
 - Add hb-cairo glue
 
 - Add sanitize API (and a cached version, that saves result on blob user-data)
 
-- Add glib GBoxedType stuff and introspection
-
 - BCP 47 language handling / API (language_matches?)
 
-- Add hb_font_create_linear()?
+- Add hb_font_create_unscaled()?
 
-- Add query API for aalt-like features?
+- Add query / enumeration API for aalt-like features?
 
 - SFNT api? get_num_faces? get_table_tags? (there's something in stash)
 
@@ -67,7 +61,7 @@ API additions
 hb-view / hb-shape enhancements:
 ===============================
 
-- Add --width, --height, --auto-size, --align, etc?
+- Add --width, --height, --auto-size, --ink-box, --align, etc?
 
 
 Tests to write:

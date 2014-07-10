@@ -31,10 +31,13 @@
 #define VIEW_CAIRO_HH
 
 
-struct view_cairo_t {
+struct view_cairo_t
+{
   view_cairo_t (option_parser_t *parser)
 	       : output_options (parser, helper_cairo_supported_formats),
-	         view_options (parser) {}
+		 view_options (parser),
+		 direction (HB_DIRECTION_INVALID),
+		 lines (0), scale (1.0) {}
   ~view_cairo_t (void) {
     if (debug)
       cairo_debug_reset_static_data ();
@@ -79,7 +82,11 @@ struct view_cairo_t {
       helper_cairo_line_t &line = g_array_index (lines, helper_cairo_line_t, i);
       line.finish ();
     }
+#if GLIB_CHECK_VERSION (2, 22, 0)
     g_array_unref (lines);
+#else
+    g_array_free (lines, TRUE);
+#endif
   }
 
   protected:

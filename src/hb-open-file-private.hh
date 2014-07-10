@@ -110,9 +110,9 @@ typedef struct OffsetTable
   protected:
   Tag		sfnt_version;	/* '\0\001\0\00' if TrueType / 'OTTO' if CFF */
   USHORT	numTables;	/* Number of tables. */
-  USHORT	searchRange;	/* (Maximum power of 2 <= numTables) x 16 */
-  USHORT	entrySelector;	/* Log2(maximum power of 2 <= numTables). */
-  USHORT	rangeShift;	/* NumTables x 16-searchRange. */
+  USHORT	searchRangeZ;	/* (Maximum power of 2 <= numTables) x 16 */
+  USHORT	entrySelectorZ;	/* Log2(maximum power of 2 <= numTables). */
+  USHORT	rangeShiftZ;	/* NumTables x 16-searchRange. */
   TableRecord	tables[VAR];	/* TableRecord entries. numTables items */
   public:
   DEFINE_SIZE_ARRAY (12, tables);
@@ -139,7 +139,7 @@ struct TTCHeaderVersion1
   Tag		ttcTag;		/* TrueType Collection ID string: 'ttcf' */
   FixedVersion	version;	/* Version of the TTC Header (1.0),
 				 * 0x00010000 */
-  LongOffsetLongArrayOf<OffsetTable>
+  ArrayOf<OffsetTo<OffsetTable, ULONG>, ULONG>
 		table;		/* Array of offsets to the OffsetTable for each font
 				 * from the beginning of the file */
   public:

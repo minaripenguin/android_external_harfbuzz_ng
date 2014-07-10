@@ -7,7 +7,7 @@ DISTCLEANFILES =
 MAINTAINERCLEANFILES =
 
 manifests:
-	@$(srcdir)/hb-manifest-update "$(srcdir)/texts" "$(srcdir)/fonts"
+	@$(srcdir)/hb-manifest-update "$(srcdir)/texts" "$(srcdir)/fonts" "$(srcdir)/tests"
 
 EXTRA_DIST += \
 	hb-diff \
@@ -20,6 +20,10 @@ EXTRA_DIST += \
 	hb-unicode-decode \
 	hb-unicode-encode \
 	hb-unicode-prettyname \
+	run-tests.sh \
+	texts/in-tree \
+	fonts/sha1sum \
+	$(TESTS) \
 	$(NULL)
 
 # TODO Figure out Python stuff
@@ -29,6 +33,33 @@ EXTRA_DIST += \
 CLEANFILES += \
 	hb_test_tools.py[co] \
 	$(NULL)
+
+TESTS = \
+	tests/context-matching.tests \
+	tests/indic-pref-blocking.tests \
+	$(NULL)
+
+TEST_EXTENSIONS = \
+	.tests \
+	$(NULL)
+
+AM_TESTS_ENVIRONMENT = \
+	EXEEXT="$(EXEEXT)"; \
+	export EXEECT; \
+	srcdir="$(srcdir)"; \
+	export srcdir; \
+	builddir="$(builddir)"; \
+	export builddir; \
+	$(NULL)
+
+if AUTOMAKE_OLDER_THAN_1_13
+TESTS_ENVIRONMENT = \
+	$(AM_TESTS_ENVIRONMENT) \
+	$(TESTS_LOG_COMPILER) \
+	$(NULL)
+endif
+
+TESTS_LOG_COMPILER = sh $(srcdir)/run-tests.sh
 
 .PHONY: manifests
 

@@ -39,6 +39,7 @@ namespace OT {
 
 #define NOT_COVERED		((unsigned int) -1)
 #define MAX_NESTING_LEVEL	8
+#define MAX_CONTEXT_LENGTH	64
 
 
 
@@ -102,7 +103,8 @@ struct RecordArrayOf : SortedArrayOf<Record<Type> > {
   }
   inline bool find_index (hb_tag_t tag, unsigned int *index) const
   {
-    int i = this->search (tag);
+    /* If we want to allow non-sorted data, we can lsearch(). */
+    int i = this->/*lsearch*/bsearch (tag);
     if (i != -1) {
         if (index) *index = i;
         return true;
@@ -129,8 +131,7 @@ struct RecordListOf : RecordArrayOf<Type>
 struct RangeRecord
 {
   inline int cmp (hb_codepoint_t g) const {
-    hb_codepoint_t a = start, b = end;
-    return g < a ? -1 : g <= b ? 0 : +1 ;
+    return g < start ? -1 : g <= end ? 0 : +1 ;
   }
 
   inline bool sanitize (hb_sanitize_context_t *c) {
@@ -203,7 +204,7 @@ struct LangSys
     return TRACE_RETURN (c->check_struct (this) && featureIndex.sanitize (c));
   }
 
-  Offset	lookupOrder;	/* = Null (reserved for an offset to a
+  Offset<>	lookupOrderZ;	/* = Null (reserved for an offset to a
 				 * reordering table) */
   USHORT	reqFeatureIndex;/* Index of a feature required for this
 				 * language system--if no required features
@@ -377,7 +378,7 @@ struct FeatureParamsStylisticSet
     return TRACE_RETURN (c->check_struct (this));
   }
 
-  USHORT	minorVersion;	/* (set to 0): This corresponds to a “minor”
+  USHORT	version;	/* (set to 0): This corresponds to a “minor”
 				 * version number. Additional data may be
 				 * added to the end of this Feature Parameters
 				 * table in the future. */
@@ -400,6 +401,7 @@ struct FeatureParamsStylisticSet
   DEFINE_SIZE_STATIC (4);
 };
 
+/* http://www.microsoft.com/typography/otspec/features_ae.htm#cv01-cv99 */
 struct FeatureParamsCharacterVariants
 {
   inline bool sanitize (hb_sanitize_context_t *c) {
@@ -500,11 +502,11 @@ struct Feature
      * Adobe tools, only the 'size' feature had FeatureParams defined.
      */
 
-    Offset orig_offset = featureParams;
+    OffsetTo<FeatureParams> orig_offset = featureParams;
     if (unlikely (!featureParams.sanitize (c, this, closure ? closure->tag : HB_TAG_NONE)))
       return TRACE_RETURN (false);
 
-    if (likely (!orig_offset))
+    if (likely (orig_offset.is_null ()))
       return TRACE_RETURN (true);
 
     if (featureParams == 0 && closure &&
@@ -512,13 +514,13 @@ struct Feature
 	closure->list_base && closure->list_base < this)
     {
       unsigned int new_offset_int = (unsigned int) orig_offset -
-				    ((char *) this - (char *) closure->list_base);
+				    (((char *) this) - ((char *) closure->list_base));
 
-      Offset new_offset;
+      OffsetTo<FeatureParams> new_offset;
       /* Check that it did not overflow. */
       new_offset.set (new_offset_int);
       if (new_offset == new_offset_int &&
-	  featureParams.try_set (c, new_offset) &&
+	  c->try_set (&featureParams, new_offset) &&
 	  !featureParams.sanitize (c, this, closure ? closure->tag : HB_TAG_NONE))
 	return TRACE_RETURN (false);
     }
@@ -607,7 +609,7 @@ struct Lookup
 
   USHORT	lookupType;		/* Different enumerations for GSUB and GPOS */
   USHORT	lookupFlag;		/* Lookup qualifiers */
-  ArrayOf<Offset>
+  ArrayOf<Offset<> >
 		subTable;		/* Array of SubTables */
   USHORT	markFilteringSetX[VAR];	/* Index (base 0) into GDEF mark glyph sets
 					 * structure. This field is only present if bit
@@ -630,7 +632,7 @@ struct CoverageFormat1
   private:
   inline unsigned int get_coverage (hb_codepoint_t glyph_id) const
   {
-    int i = glyphArray.search (glyph_id);
+    int i = glyphArray.bsearch (glyph_id);
     ASSERT_STATIC (((unsigned int) -1) == NOT_COVERED);
     return i;
   }
@@ -695,7 +697,7 @@ struct CoverageFormat2
   private:
   inline unsigned int get_coverage (hb_codepoint_t glyph_id) const
   {
-    int i = rangeRecord.search (glyph_id);
+    int i = rangeRecord.bsearch (glyph_id);
     if (i != -1) {
       const RangeRecord &range = rangeRecord[i];
       return (unsigned int) range.value + (glyph_id - range.start);
@@ -872,16 +874,16 @@ struct Coverage
     inline void init (const Coverage &c_) {
       format = c_.u.format;
       switch (format) {
-      case 1: return u.format1.init (c_.u.format1);
-      case 2: return u.format2.init (c_.u.format2);
-      default:return;
+      case 1: u.format1.init (c_.u.format1); return;
+      case 2: u.format2.init (c_.u.format2); return;
+      default:                               return;
       }
     }
     inline bool more (void) {
       switch (format) {
       case 1: return u.format1.more ();
       case 2: return u.format2.more ();
-      default:return true;
+      default:return false;
       }
     }
     inline void next (void) {
@@ -895,14 +897,14 @@ struct Coverage
       switch (format) {
       case 1: return u.format1.get_glyph ();
       case 2: return u.format2.get_glyph ();
-      default:return true;
+      default:return 0;
       }
     }
     inline uint16_t get_coverage (void) {
       switch (format) {
       case 1: return u.format1.get_coverage ();
       case 2: return u.format2.get_coverage ();
-      default:return true;
+      default:return -1;
       }
     }
 
@@ -956,6 +958,19 @@ struct ClassDefFormat1
 
   inline bool intersects_class (const hb_set_t *glyphs, unsigned int klass) const {
     unsigned int count = classValue.len;
+    if (klass == 0)
+    {
+      /* Match if there's any glyph that is not listed! */
+      hb_codepoint_t g = -1;
+      if (!hb_set_next (glyphs, &g))
+        return false;
+      if (g < startGlyph)
+        return true;
+      g = startGlyph + count - 1;
+      if (hb_set_next (glyphs, &g))
+        return true;
+      /* Fall through. */
+    }
     for (unsigned int i = 0; i < count; i++)
       if (classValue[i] == klass && glyphs->has (startGlyph + i))
         return true;
@@ -978,7 +993,7 @@ struct ClassDefFormat2
   private:
   inline unsigned int get_class (hb_codepoint_t glyph_id) const
   {
-    int i = rangeRecord.search (glyph_id);
+    int i = rangeRecord.bsearch (glyph_id);
     if (i != -1)
       return rangeRecord[i].value;
     return 0;
@@ -999,6 +1014,22 @@ struct ClassDefFormat2
 
   inline bool intersects_class (const hb_set_t *glyphs, unsigned int klass) const {
     unsigned int count = rangeRecord.len;
+    if (klass == 0)
+    {
+      /* Match if there's any glyph that is not listed! */
+      hb_codepoint_t g = (hb_codepoint_t) -1;
+      for (unsigned int i = 0; i < count; i++)
+      {
+	if (!hb_set_next (glyphs, &g))
+	  break;
+	if (g < rangeRecord[i].start)
+	  return true;
+	g = rangeRecord[i].end;
+      }
+      if (g != (hb_codepoint_t) -1 && hb_set_next (glyphs, &g))
+        return true;
+      /* Fall through. */
+    }
     for (unsigned int i = 0; i < count; i++)
       if (rangeRecord[i].value == klass && rangeRecord[i].intersects (glyphs))
         return true;
@@ -1083,7 +1114,7 @@ struct Device
 
     if (!pixels) return 0;
 
-    return pixels * (int64_t) scale / ppem;
+    return (int) (pixels * (int64_t) scale / ppem);
   }
 
 
