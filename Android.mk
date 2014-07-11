@@ -70,23 +70,3 @@ LOCAL_C_INCLUDES += \
 LOCAL_CFLAGS += -DHB_NO_MT -DHAVE_OT -DHAVE_ICU -DHAVE_ICU_BUILTIN
 LOCAL_MODULE:= libharfbuzz_ng
 include $(BUILD_SHARED_LIBRARY)
-
-#############################################################
-#   build the harfbuzz static library
-#
-include $(CLEAR_VARS)
-LOCAL_ARM_MODE := arm
-LOCAL_MODULE_TAGS := optional
-LOCAL_SRC_FILES:= \
-	$(HARFBUZZ_SRC_FILES) \
-	src/hb-ucdn.cc \
-	src/hb-ucdn/ucdn.c
-LOCAL_CPP_EXTENSION := .cc
-LOCAL_STATIC_LIBRARIES := libft2
-LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/src \
-	external/freetype/include
-LOCAL_CFLAGS += -DHB_NO_MT -DHAVE_OT -DHAVE_UCDN -DHAVE_FREETYPE
-LOCAL_MODULE:= libharfbuzz_ng
-
-include $(BUILD_STATIC_LIBRARY)
