@@ -116,7 +116,7 @@
 #define HB_FUNC __func__
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
    /* We need Windows Vista for both Uniscribe backend and for
     * MemoryBarrier.  We don't support compiling on Windows XP,
     * though we run on it fine. */
@@ -284,7 +284,7 @@ typedef int (*hb_compare_func_t) (const void *, const void *);
 /* arrays and maps */
 
 
-#define HB_PREALLOCED_ARRAY_INIT {0}
+#define HB_PREALLOCED_ARRAY_INIT {0, 0, NULL}
 template <typename Type, unsigned int StaticSize=16>
 struct hb_prealloced_array_t
 {
