@@ -47,12 +47,14 @@ TESTS = \
 	tests/context-matching.tests \
 	tests/cursive-positioning.tests \
 	tests/default-ignorables.tests \
+	tests/fallback-positioning.tests \
 	tests/fuzzed.tests \
 	tests/hangul-jamo.tests \
 	tests/hyphens.tests \
 	tests/indic-joiner-candrabindu.tests \
 	tests/indic-old-spec.tests \
 	tests/indic-pref-blocking.tests \
+	tests/language-tags.tests \
 	tests/ligature-id.tests \
 	tests/mark-filtering-sets.tests \
 	tests/mongolian-variation-selector.tests \
