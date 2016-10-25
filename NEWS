@@ -1,3 +1,46 @@
+Overview of changes leading to 1.3.2
+Wednesday, September 27, 2016
+====================================
+
+- Fix build of hb-coretext on older OS X versions.
+
+
+Overview of changes leading to 1.3.1
+Wednesday, September 7, 2016
+====================================
+
+- Blacklist bad GDEF of more fonts (Padauk).
+- More CoreText backend crash fixes with OS X 10.9.5.
+- Misc fixes.
+
+
+Overview of changes leading to 1.3.0
+Thursday, July 21, 2016
+====================================
+
+- Update to Unicode 9.0.0
+- Move Javanese from Indic shaper to Universal Shaping Engine.
+- Allow MultipleSubst to delete a glyph (matching Windows engine).
+- Update Universal Shaping Engine to latest draft from Microsoft.
+- DirectWrite backend improvements.  Note: this backend is for testing ONLY.
+- CoreText backend improvements with unreachable fonts.
+- Implement symbol fonts (cmap 3.0.0) in hb-ft and hb-ot-font.
+- Blacklist bad GDEF of more fonts (Tahoma & others).
+- Misc fixes.
+
+
+Overview of changes leading to 1.2.7
+Monday, May 2, 2016
+====================================
+
+- Blacklist another version of Times New Roman (Bold) Italic from Windows 7.
+- Fix Mongolian Free Variation Selectors shaping with certain fonts.
+- Fix Tibetan shorthand contractions shaping.
+- Improved list of language tag mappings.
+- Unbreak build on Windows CE.
+- Make 'glyf' table loading lazy in hb-ot-font.
+
+
 Overview of changes leading to 1.2.6
 Friday, April 8, 2016
 ====================================
