@@ -75,6 +75,7 @@ cc_library_shared {
         "src/hb-ot-font.cc",
         "src/hb-ot-layout.cc",
         "src/hb-ot-map.cc",
+        "src/hb-ot-math.cc",
         "src/hb-ot-shape.cc",
         "src/hb-ot-shape-complex-arabic.cc",
         "src/hb-ot-shape-complex-default.cc",
@@ -89,6 +90,7 @@ cc_library_shared {
         "src/hb-ot-shape-complex-use-table.cc",
         "src/hb-ot-shape-normalize.cc",
         "src/hb-ot-shape-fallback.cc",
+        "src/hb-ot-var.cc",
 
         "src/hb-icu.cc",
     ],
