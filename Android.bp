@@ -53,6 +53,7 @@
 //
 cc_library_shared {
     name: "libharfbuzz_ng",
+    host_supported: true,
     arch: {
         arm: {
             instruction_set: "arm",
@@ -97,11 +98,23 @@ cc_library_shared {
         "src/hb-icu.cc",
     ],
 
+    target: {
+        android: {
+            shared_libs: [
+                "libutils",
+            ],
+        },
+        host: {
+            static_libs: [
+                "libutils",
+            ],
+        },
+    },
+
     shared_libs: [
         "libcutils",
         "libicuuc",
         "libicui18n",
-        "libutils",
         "liblog",
     ],
 
