@@ -60,7 +60,6 @@ cc_library_shared {
         },
     },
     srcs: [
-        "src/hb-aat-layout.cc",
         "src/hb-blob.cc",
         "src/hb-buffer-serialize.cc",
         "src/hb-buffer.cc",
@@ -75,7 +74,6 @@ cc_library_shared {
         "src/hb-static.cc",
         "src/hb-unicode.cc",
         "src/hb-warning.cc",
-        "src/hb-ot-face.cc",
         "src/hb-ot-font.cc",
         "src/hb-ot-layout.cc",
         "src/hb-ot-map.cc",
@@ -90,6 +88,7 @@ cc_library_shared {
         "src/hb-ot-shape-complex-khmer.cc",
         "src/hb-ot-shape-complex-myanmar.cc",
         "src/hb-ot-shape-complex-thai.cc",
+        "src/hb-ot-shape-complex-tibetan.cc",
         "src/hb-ot-shape-complex-use.cc",
         "src/hb-ot-shape-complex-use-table.cc",
         "src/hb-ot-shape-normalize.cc",

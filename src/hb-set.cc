@@ -24,7 +24,7 @@
  * Google Author(s): Behdad Esfahbod
  */
 
-#include "hb-set.hh"
+#include "hb-set-private.hh"
 
 
 /* Public API */

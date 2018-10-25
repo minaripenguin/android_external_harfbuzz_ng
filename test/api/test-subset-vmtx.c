@@ -48,12 +48,11 @@ test_subset_vmtx_simple_subset (void)
 {
   hb_face_t *face_full = hb_subset_test_open_font ("fonts/Mplus1p-Regular.660E,6975,73E0,5EA6,8F38,6E05.ttf");
   hb_face_t *face_subset = hb_subset_test_open_font ("fonts/Mplus1p-Regular.660E.ttf");
-  hb_face_t *face_full_subset;
 
   hb_set_t *codepoints = hb_set_create ();
   hb_set_add (codepoints, 0x660E);
 
-  face_full_subset = hb_subset_test_create_subset (face_full, hb_subset_test_create_input (codepoints));
+  hb_face_t *face_full_subset = hb_subset_test_create_subset (face_full, hb_subset_test_create_input (codepoints));
   hb_set_destroy (codepoints);
 
   check_num_vmetrics(face_full_subset, 1); /* nothing has same width */
@@ -68,7 +67,6 @@ static void
 test_subset_vmtx_noop (void)
 {
   hb_face_t *face_full = hb_subset_test_open_font ("fonts/Mplus1p-Regular.660E,6975,73E0,5EA6,8F38,6E05.ttf");
-  hb_face_t *face_full_subset;
 
   hb_set_t *codepoints = hb_set_create();
   hb_set_add (codepoints, 0x660E);
@@ -77,7 +75,7 @@ test_subset_vmtx_noop (void)
   hb_set_add (codepoints, 0x5EA6);
   hb_set_add (codepoints, 0x8F38);
   hb_set_add (codepoints, 0x6E05);
-  face_full_subset = hb_subset_test_create_subset (face_full, hb_subset_test_create_input (codepoints));
+  hb_face_t *face_full_subset = hb_subset_test_create_subset (face_full, hb_subset_test_create_input (codepoints));
   hb_set_destroy (codepoints);
 
   check_num_vmetrics(face_full_subset, 1); /* all have the same width */

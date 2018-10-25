@@ -27,7 +27,7 @@
 #ifndef HB_BUFFER_DESERIALIZE_JSON_HH
 #define HB_BUFFER_DESERIALIZE_JSON_HH
 
-#include "hb.hh"
+#include "hb-private.hh"
 
 %%{
 

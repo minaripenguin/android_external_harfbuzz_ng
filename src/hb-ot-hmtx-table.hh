@@ -27,10 +27,11 @@
 #ifndef HB_OT_HMTX_TABLE_HH
 #define HB_OT_HMTX_TABLE_HH
 
-#include "hb-open-type.hh"
+#include "hb-open-type-private.hh"
 #include "hb-ot-hhea-table.hh"
 #include "hb-ot-os2-table.hh"
 #include "hb-ot-var-hvar-table.hh"
+#include "hb-subset-plan.hh"
 
 /*
  * hmtx -- Horizontal Metrics
@@ -48,7 +49,7 @@ namespace OT {
 struct LongMetric
 {
   UFWORD	advance; /* Advance width/height. */
-  FWORD		sb; /* Leading (left/top) side bearing. */
+  FWORD		lsb; /* Leading (left/top) side bearing. */
   public:
   DEFINE_SIZE_STATIC (4);
 };
@@ -134,8 +135,8 @@ struct hmtxvmtx
         }
         else
         {
-          /* dest just sb */
-          *((FWORD *) dest_pos) = src_metric->sb;
+          /* dest just lsb */
+          *((FWORD *) dest_pos) = src_metric->lsb;
         }
       }
       else
@@ -147,18 +148,18 @@ struct hmtxvmtx
 	  failed = true;
 	  break;
 	}
-	FWORD src_sb = *(lsbs + gids[i] - _mtx.num_advances);
+	FWORD src_lsb = *(lsbs + gids[i] - _mtx.num_advances);
         if (i < num_advances)
         {
           /* dest needs a full LongMetric */
           LongMetric *metric = (LongMetric *)dest_pos;
           metric->advance = src_metric->advance;
-          metric->sb = src_sb;
+          metric->lsb = src_lsb;
         }
         else
         {
-          /* dest just needs an sb */
-          *((FWORD *) dest_pos) = src_sb;
+          /* dest just needs an lsb */
+          *((FWORD *) dest_pos) = src_lsb;
         }
       }
       dest_pos += (i < num_advances ? 4 : 2);
@@ -249,33 +250,20 @@ struct hmtxvmtx
       hb_blob_destroy (var_blob);
     }
 
-    /* TODO Add variations version. */
-    inline unsigned int get_side_bearing (hb_codepoint_t glyph) const
-    {
-      if (glyph < num_advances)
-        return table->longMetricZ[glyph].sb;
-
-      if (unlikely (glyph > num_metrics))
-        return 0;
-
-      const FWORD *bearings = (const FWORD *) &table->longMetricZ[num_advances];
-      return bearings[glyph - num_advances];
-    }
-
-    inline unsigned int get_advance (hb_codepoint_t glyph) const
+    inline unsigned int get_advance (hb_codepoint_t  glyph) const
     {
       if (unlikely (glyph >= num_metrics))
       {
-	/* If num_metrics is zero, it means we don't have the metrics table
-	 * for this direction: return default advance.  Otherwise, it means that the
-	 * glyph index is out of bound: return zero. */
-	if (num_metrics)
-	  return 0;
-	else
-	  return default_advance;
+        /* If num_metrics is zero, it means we don't have the metrics table
+         * for this direction: return default advance.  Otherwise, it means that the
+         * glyph index is out of bound: return zero. */
+        if (num_metrics)
+          return 0;
+        else
+          return default_advance;
       }
 
-      return table->longMetricZ[MIN (glyph, (uint32_t) num_advances - 1)].advance;
+      return table->longMetric[MIN (glyph, (uint32_t) num_advances - 1)].advance;
     }
 
     inline unsigned int get_advance (hb_codepoint_t  glyph,
@@ -284,7 +272,7 @@ struct hmtxvmtx
       unsigned int advance = get_advance (glyph);
       if (likely(glyph < num_metrics))
       {
-	advance += (font->num_coords ? var_table->get_advance_var (glyph, font->coords, font->num_coords) : 0); // TODO Optimize?!
+        advance += (font->num_coords ? var_table->get_advance_var (glyph, font->coords, font->num_coords) : 0); // TODO Optimize?!
       }
       return advance;
     }
@@ -308,7 +296,7 @@ struct hmtxvmtx
   };
 
   protected:
-  UnsizedArrayOf<LongMetric>longMetricZ;/* Paired advance width and leading
+  LongMetric	longMetric[VAR];	/* Paired advance width and leading
 					 * bearing values for each glyph. The
 					 * value numOfHMetrics comes from
 					 * the 'hhea' table. If the font is
@@ -316,7 +304,7 @@ struct hmtxvmtx
 					 * be in the array, but that entry is
 					 * required. The last entry applies to
 					 * all subsequent glyphs. */
-/*UnsizedArrayOf<FWORD>	leadingBearingX;*//* Here the advance is assumed
+/*FWORD		leadingBearingX[VAR];*/	/* Here the advance is assumed
 					 * to be the same as the advance
 					 * for the last entry above. The
 					 * number of entries in this array is
@@ -330,7 +318,7 @@ struct hmtxvmtx
 					 * font to vary the side bearing
 					 * values for each glyph. */
   public:
-  DEFINE_SIZE_ARRAY (0, longMetricZ);
+  DEFINE_SIZE_ARRAY (0, longMetric);
 };
 
 struct hmtx : hmtxvmtx<hmtx, hhea> {
@@ -343,9 +331,6 @@ struct vmtx : hmtxvmtx<vmtx, vhea> {
   static const hb_tag_t variationsTag	= HB_OT_TAG_VVAR;
   static const hb_tag_t os2Tag		= HB_TAG_NONE;
 };
-
-struct hmtx_accelerator_t : hmtx::accelerator_t {};
-struct vmtx_accelerator_t : vmtx::accelerator_t {};
 
 } /* namespace OT */
 

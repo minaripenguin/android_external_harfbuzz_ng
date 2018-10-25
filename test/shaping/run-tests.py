@@ -2,22 +2,24 @@
 
 from __future__ import print_function, division, absolute_import
 
-import sys, os, subprocess, tempfile
+import sys, os, subprocess
 
 
 def cmd(command):
-	# https://stackoverflow.com/a/4408409
-	with tempfile.TemporaryFile() as tempf:
-		p = subprocess.Popen (command, stdout=tempf, stderr=sys.stdout)
-		p.wait ()
-		tempf.seek(0)
-		return tempf.read().decode ("utf-8").strip (), p.returncode
+	p = subprocess.Popen (
+		command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	p.wait ()
+	print (p.stderr.read (), end="") # file=sys.stderr
+	return p.stdout.read ().decode ("utf-8").strip (), p.returncode
+
 
 args = sys.argv[1:]
 if not args or sys.argv[1].find('hb-shape') == -1 or not os.path.exists (sys.argv[1]):
 	print ("""First argument does not seem to point to usable hb-shape.""")
 	sys.exit (1)
 hb_shape, args = args[0], args[1:]
+
+extra_options = "--verify"
 
 fails = 0
 
@@ -46,11 +48,6 @@ for filename in args:
 		cwd = os.path.dirname(filename)
 		fontfile = os.path.normpath (os.path.join (cwd, fontfile))
 
-		extra_options = ["--shaper=ot"]
-		glyphs_expected = glyphs_expected.strip()
-		if glyphs_expected != '*':
-			extra_options.append("--verify")
-
 		if line.startswith ("#"):
 			if not reference:
 				print ("# %s %s --unicodes %s" % (hb_shape, fontfile, unicodes))
@@ -58,19 +55,19 @@ for filename in args:
 
 		if not reference:
 			print ("%s %s %s %s --unicodes %s" %
-					 (hb_shape, fontfile, ' '.join(extra_options), options, unicodes))
+					 (hb_shape, fontfile, extra_options, options, unicodes))
 
 		glyphs1, returncode = cmd ([hb_shape, "--font-funcs=ft",
-			fontfile] + extra_options + ["--unicodes",
+			fontfile, extra_options, "--unicodes",
 			unicodes] + (options.split (' ') if options else []))
 
 		if returncode:
-			print ("ERROR: hb-shape --font-funcs=ft failed.") # file=sys.stderr
+			print ("hb-shape --font-funcs=ft failed.") # file=sys.stderr
 			fails = fails + 1
 			#continue
 
 		glyphs2, returncode = cmd ([hb_shape, "--font-funcs=ot",
-			fontfile] + extra_options + ["--unicodes",
+			fontfile, extra_options, "--unicodes",
 			unicodes] + (options.split (' ') if options else []))
 
 		if returncode:
@@ -78,7 +75,7 @@ for filename in args:
 			fails = fails + 1
 			#continue
 
-		if glyphs1 != glyphs2 and glyphs_expected != '*':
+		if glyphs1 != glyphs2:
 			print ("FT funcs: " + glyphs1) # file=sys.stderr
 			print ("OT funcs: " + glyphs2) # file=sys.stderr
 			fails = fails + 1
@@ -87,7 +84,7 @@ for filename in args:
 			print (":".join ([fontfile, options, unicodes, glyphs1]))
 			continue
 
-		if glyphs1.strip() != glyphs_expected and glyphs_expected != '*':
+		if glyphs1.strip() != glyphs_expected.strip():
 			print ("Actual:   " + glyphs1) # file=sys.stderr
 			print ("Expected: " + glyphs_expected) # file=sys.stderr
 			fails = fails + 1

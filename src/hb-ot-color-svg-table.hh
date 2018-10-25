@@ -25,7 +25,7 @@
 #ifndef HB_OT_COLOR_SVG_TABLE_HH
 #define HB_OT_COLOR_SVG_TABLE_HH
 
-#include "hb-open-type.hh"
+#include "hb-open-type-private.hh"
 
 /*
  * SVG -- SVG (Scalable Vector Graphics)
@@ -54,7 +54,7 @@ struct SVGDocumentIndexEntry
 				 * this index entry. */
   HBUINT16	endGlyphID;	/* The last glyph ID in the range described by
 				 * this index entry. Must be >= startGlyphID. */
-  LOffsetTo<UnsizedArrayOf<HBUINT8>, false>
+  LOffsetTo<UnsizedArrayOf<HBUINT8> >
 		svgDoc;		/* Offset from the beginning of the SVG Document Index
 				 * to an SVG document. Must be non-zero. */
   HBUINT32 svgDocLength;	/* Length of the SVG document.
