@@ -24,7 +24,7 @@
  * Google Author(s): Behdad Esfahbod
  */
 
-#include "hb-ot-shape-complex-khmer.hh"
+#include "hb-ot-shape-complex-khmer-private.hh"
 
 int
 main (void)
@@ -34,8 +34,10 @@ main (void)
     hb_glyph_info_t info;
     info.codepoint = u;
     set_khmer_properties (info);
-    if (info.khmer_category() != INDIC_SYLLABIC_CATEGORY_OTHER)
-      printf("U+%04X	%u\n", u,
-	     info.khmer_category());
+    if (info.khmer_category() != INDIC_SYLLABIC_CATEGORY_OTHER ||
+	info.khmer_position() != INDIC_MATRA_CATEGORY_NOT_APPLICABLE)
+      printf("U+%04X	%u	%u\n", u,
+	     info.khmer_category(),
+	     info.khmer_position());
   }
 }
