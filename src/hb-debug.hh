@@ -27,8 +27,8 @@
 #ifndef HB_DEBUG_HH
 #define HB_DEBUG_HH
 
-#include "hb-private.hh"
-#include "hb-atomic-private.hh"
+#include "hb.hh"
+#include "hb-atomic.hh"
 #include "hb-dsalgs.hh"
 
 
@@ -43,9 +43,10 @@
 
 struct hb_options_t
 {
-  unsigned int unused : 1; /* In-case sign bit is here. */
-  unsigned int initialized : 1;
-  unsigned int uniscribe_bug_compatible : 1;
+  bool unused : 1; /* In-case sign bit is here. */
+  bool initialized : 1;
+  bool uniscribe_bug_compatible : 1;
+  bool aat : 1;
 };
 
 union hb_options_union_t {
@@ -67,7 +68,10 @@ hb_options (void)
   u.i = _hb_options.get_relaxed ();
 
   if (unlikely (!u.i))
+  {
     _hb_options_init ();
+    u.i = _hb_options.get_relaxed ();
+  }
 
   return u.opts;
 }
