@@ -24,7 +24,7 @@
  * Google Author(s): Behdad Esfahbod
  */
 
-#include "hb-map.hh"
+#include "hb-map-private.hh"
 
 
 /* Public API */

@@ -24,7 +24,7 @@
  * Google Author(s): Behdad Esfahbod
  */
 
-#include "hb-ot-shape-complex-myanmar.hh"
+#include "hb-ot-shape-complex-myanmar-private.hh"
 
 int
 main (void)

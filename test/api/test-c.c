@@ -32,7 +32,6 @@
 #endif
 
 #include <hb.h>
-#include <hb-ot.h>
 
 #ifdef HAVE_GLIB
 #include <hb-glib.h>
@@ -46,6 +45,10 @@
 #include <hb-ft.h>
 #endif
 
+#ifdef HAVE_OT
+#include <hb-ot.h>
+#endif
+
 #ifdef HAVE_UNISCRIBE
 #include <hb-uniscribe.h>
 #endif
@@ -55,7 +58,7 @@
 #endif
 
 int
-main (void)
+main (int argc, char **argv)
 {
   return !*hb_shape_list_shapers ();
 }

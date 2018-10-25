@@ -29,9 +29,9 @@
 #ifndef HB_OT_LAYOUT_GDEF_TABLE_HH
 #define HB_OT_LAYOUT_GDEF_TABLE_HH
 
-#include "hb-ot-layout-common.hh"
+#include "hb-ot-layout-common-private.hh"
 
-#include "hb-font.hh"
+#include "hb-font-private.hh"
 
 
 namespace OT {
@@ -337,7 +337,6 @@ struct MarkGlyphSets
  * https://docs.microsoft.com/en-us/typography/opentype/spec/gdef
  */
 
-
 struct GDEF
 {
   static const hb_tag_t tableTag	= HB_OT_TAG_GDEF;
@@ -387,8 +386,21 @@ struct GDEF
   inline const VariationStore &get_var_store (void) const
   { return version.to_int () >= 0x00010003u ? this+varStore : Null(VariationStore); }
 
+  inline bool sanitize (hb_sanitize_context_t *c) const
+  {
+    TRACE_SANITIZE (this);
+    return_trace (version.sanitize (c) &&
+		  likely (version.major == 1) &&
+		  glyphClassDef.sanitize (c, this) &&
+		  attachList.sanitize (c, this) &&
+		  ligCaretList.sanitize (c, this) &&
+		  markAttachClassDef.sanitize (c, this) &&
+		  (version.to_int () < 0x00010002u || markGlyphSetsDef.sanitize (c, this)) &&
+		  (version.to_int () < 0x00010003u || varStore.sanitize (c, this)));
+  }
+
   /* glyph_props is a 16-bit integer where the lower 8-bit have bits representing
-   * glyph class and other bits, and high 8-bit the mark attachment type (if any).
+   * glyph class and other bits, and high 8-bit gthe mark attachment type (if any).
    * Not to be confused with lookup_props which is very similar. */
   inline unsigned int get_glyph_props (hb_codepoint_t glyph) const
   {
@@ -408,38 +420,6 @@ struct GDEF
     }
   }
 
-  struct accelerator_t
-  {
-    HB_INTERNAL inline void init (hb_face_t *face);
-
-    inline void fini (void)
-    {
-      hb_blob_destroy (this->blob);
-    }
-
-    hb_blob_t *blob;
-    const GDEF *table;
-  };
-
-  inline unsigned int get_size (void) const
-  {
-    return min_size +
-	   (version.to_int () >= 0x00010002u ? markGlyphSetsDef.static_size : 0) +
-	   (version.to_int () >= 0x00010003u ? varStore.static_size : 0);
-  }
-
-  inline bool sanitize (hb_sanitize_context_t *c) const
-  {
-    TRACE_SANITIZE (this);
-    return_trace (version.sanitize (c) &&
-		  likely (version.major == 1) &&
-		  glyphClassDef.sanitize (c, this) &&
-		  attachList.sanitize (c, this) &&
-		  ligCaretList.sanitize (c, this) &&
-		  markAttachClassDef.sanitize (c, this) &&
-		  (version.to_int () < 0x00010002u || markGlyphSetsDef.sanitize (c, this)) &&
-		  (version.to_int () < 0x00010003u || varStore.sanitize (c, this)));
-  }
 
   protected:
   FixedVersion<>version;		/* Version of the GDEF table--currently
@@ -474,7 +454,6 @@ struct GDEF
   DEFINE_SIZE_MIN (12);
 };
 
-struct GDEF_accelerator_t : GDEF::accelerator_t {};
 
 } /* namespace OT */
 

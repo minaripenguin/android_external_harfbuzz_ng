@@ -27,7 +27,7 @@
 #ifndef HB_OT_HHEA_TABLE_HH
 #define HB_OT_HHEA_TABLE_HH
 
-#include "hb-open-type.hh"
+#include "hb-open-type-private.hh"
 
 /*
  * hhea -- Horizontal Header

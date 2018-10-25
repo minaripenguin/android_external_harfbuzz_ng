@@ -22,9 +22,9 @@
  * PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
  */
 
-#include "hb.hh"
+#include "hb-private.hh"
 #define HB_SHAPER directwrite
-#include "hb-shaper-impl.hh"
+#include "hb-shaper-impl-private.hh"
 
 #include <DWrite_1.h>
 
