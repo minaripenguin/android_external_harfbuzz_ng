@@ -27,7 +27,7 @@
 #ifndef HB_OT_COLOR_CBDT_TABLE_HH
 #define HB_OT_COLOR_CBDT_TABLE_HH
 
-#include "hb-open-type.hh"
+#include "hb-open-type-private.hh"
 
 /*
  * CBLC -- Color Bitmap Location
@@ -128,7 +128,7 @@ struct IndexSubtableFormat1Or3
   {
     TRACE_SANITIZE (this);
     return_trace (c->check_struct (this) &&
-		  offsetArrayZ.sanitize (c, glyph_count + 1));
+		  c->check_array (offsetArrayZ, offsetArrayZ[0].static_size, glyph_count + 1));
   }
 
   bool get_image_data (unsigned int idx,
@@ -144,8 +144,7 @@ struct IndexSubtableFormat1Or3
   }
 
   IndexSubtableHeader	header;
-  UnsizedArrayOf<Offset<OffsetType> >
- 			offsetArrayZ;
+  Offset<OffsetType>	offsetArrayZ[VAR];
   public:
   DEFINE_SIZE_ARRAY(8, offsetArrayZ);
 };
@@ -206,23 +205,24 @@ struct IndexSubtableRecord
     TRACE_SANITIZE (this);
     return_trace (c->check_struct (this) &&
 		  firstGlyphIndex <= lastGlyphIndex &&
-		  offsetToSubtable.sanitize (c, base, lastGlyphIndex - firstGlyphIndex + 1));
+		  offsetToSubtable.sanitize (c, this, lastGlyphIndex - firstGlyphIndex + 1));
   }
 
-  inline bool get_extents (hb_glyph_extents_t *extents,
-			   const void *base) const
+  inline bool get_extents (hb_glyph_extents_t *extents) const
   {
-    return (base+offsetToSubtable).get_extents (extents);
+    return (this+offsetToSubtable).get_extents (extents);
   }
 
-  bool get_image_data (unsigned int  gid,
-		       const void   *base,
+  bool get_image_data (unsigned int gid,
 		       unsigned int *offset,
 		       unsigned int *length,
 		       unsigned int *format) const
   {
-    if (gid < firstGlyphIndex || gid > lastGlyphIndex) return false;
-    return (base+offsetToSubtable).get_image_data (gid - firstGlyphIndex,
+    if (gid < firstGlyphIndex || gid > lastGlyphIndex)
+    {
+      return false;
+    }
+    return (this+offsetToSubtable).get_image_data (gid - firstGlyphIndex,
 						   offset, length, format);
   }
 
@@ -240,7 +240,12 @@ struct IndexSubtableArray
   inline bool sanitize (hb_sanitize_context_t *c, unsigned int count) const
   {
     TRACE_SANITIZE (this);
-    return_trace (indexSubtablesZ.sanitize (c, count, this));
+    if (unlikely (!c->check_array (&indexSubtablesZ, indexSubtablesZ[0].static_size, count)))
+      return_trace (false);
+    for (unsigned int i = 0; i < count; i++)
+      if (unlikely (!indexSubtablesZ[i].sanitize (c, this)))
+	return_trace (false);
+    return_trace (true);
   }
 
   public:
@@ -250,14 +255,17 @@ struct IndexSubtableArray
     {
       unsigned int firstGlyphIndex = indexSubtablesZ[i].firstGlyphIndex;
       unsigned int lastGlyphIndex = indexSubtablesZ[i].lastGlyphIndex;
-      if (firstGlyphIndex <= glyph && glyph <= lastGlyphIndex)
+      if (firstGlyphIndex <= glyph && glyph <= lastGlyphIndex) {
         return &indexSubtablesZ[i];
+      }
     }
     return nullptr;
   }
 
   protected:
-  UnsizedArrayOf<IndexSubtableRecord>	indexSubtablesZ;
+  IndexSubtableRecord	indexSubtablesZ[VAR];
+  public:
+  DEFINE_SIZE_ARRAY(0, indexSubtablesZ);
 };
 
 struct BitmapSizeTable
@@ -270,20 +278,18 @@ struct BitmapSizeTable
     TRACE_SANITIZE (this);
     return_trace (c->check_struct (this) &&
 		  indexSubtableArrayOffset.sanitize (c, base, numberOfIndexSubtables) &&
+		  c->check_range (&(base+indexSubtableArrayOffset), indexTablesSize) &&
 		  horizontal.sanitize (c) &&
 		  vertical.sanitize (c));
   }
 
-  const IndexSubtableRecord *find_table (hb_codepoint_t glyph,
-					 const void *base,
-					 const void **out_base) const
+  const IndexSubtableRecord *find_table (hb_codepoint_t glyph, const void *base) const
   {
-    *out_base = &(base+indexSubtableArrayOffset);
     return (base+indexSubtableArrayOffset).find_table (glyph, numberOfIndexSubtables);
   }
 
   protected:
-  LOffsetTo<IndexSubtableArray, false>
+  LOffsetTo<IndexSubtableArray>
 			indexSubtableArrayOffset;
   HBUINT32		indexTablesSize;
   HBUINT32		numberOfIndexSubtables;
@@ -344,8 +350,7 @@ struct CBLC
 
   protected:
   const IndexSubtableRecord *find_table (hb_codepoint_t glyph,
-					 unsigned int *x_ppem, unsigned int *y_ppem,
-					 const void **base) const
+					 unsigned int *x_ppem, unsigned int *y_ppem) const
   {
     /* TODO: Make it possible to select strike. */
 
@@ -358,7 +363,7 @@ struct CBLC
       {
 	*x_ppem = sizeTables[i].ppemX;
 	*y_ppem = sizeTables[i].ppemY;
-	return sizeTables[i].find_table (glyph, this, base);
+	return sizeTables[i].find_table (glyph, this);
       }
     }
 
@@ -416,16 +421,15 @@ struct CBDT
       if (!cblc)
 	return false;  // Not a color bitmap font.
 
-      const void *base;
-      const IndexSubtableRecord *subtable_record = this->cblc->find_table (glyph, &x_ppem, &y_ppem, &base);
+      const IndexSubtableRecord *subtable_record = this->cblc->find_table(glyph, &x_ppem, &y_ppem);
       if (!subtable_record || !x_ppem || !y_ppem)
 	return false;
 
-      if (subtable_record->get_extents (extents, base))
+      if (subtable_record->get_extents (extents))
 	return true;
 
       unsigned int image_offset = 0, image_length = 0, image_format = 0;
-      if (!subtable_record->get_image_data (glyph, base, &image_offset, &image_length, &image_format))
+      if (!subtable_record->get_image_data (glyph, &image_offset, &image_length, &image_format))
 	return false;
 
       {
@@ -476,7 +480,7 @@ struct CBDT
           {
             unsigned int image_offset = 0, image_length = 0, image_format = 0;
 
-            if (!subtable_record.get_image_data (gid, &subtable_array,
+            if (!subtable_record.get_image_data (gid,
                   &image_offset, &image_length, &image_format))
               continue;
 
@@ -523,13 +527,11 @@ struct CBDT
 
 
   protected:
-  FixedVersion<>		version;
-  UnsizedArrayOf<HBUINT8>	dataZ;
+  FixedVersion<>	version;
+  HBUINT8		dataZ[VAR];
   public:
   DEFINE_SIZE_ARRAY(4, dataZ);
 };
-
-struct CBDT_accelerator_t : CBDT::accelerator_t {};
 
 } /* namespace OT */
 

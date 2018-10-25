@@ -3,9 +3,8 @@
 dir=`mktemp -d`
 
 out=/dev/stdout
-if test "x$1" == 'x-o'; then
-	shift
-	out=$1
+if test "x${1:0:3}" == 'x-o='; then
+	out=${1:3}
 	shift
 fi
 hb_shape=$1
