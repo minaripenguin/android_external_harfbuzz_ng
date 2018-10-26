@@ -27,13 +27,11 @@
  */
 
 #define HB_SHAPER graphite2
-#include "hb-shaper-impl.hh"
+#include "hb-shaper-impl-private.hh"
 
 #include "hb-graphite2.h"
 
 #include <graphite2/Segment.h>
-
-#include "hb-ot-tag.h"
 
 
 HB_SHAPER_DATA_ENSURE_DEFINE(graphite2, face)
@@ -97,32 +95,6 @@ retry:
   return d;
 }
 
-static void hb_graphite2_release_table(const void *data, const void *table_buffer)
-{
-  hb_graphite2_face_data_t *face_data = (hb_graphite2_face_data_t *) data;
-  hb_graphite2_tablelist_t *tlist = face_data->tlist.get();
-
-  hb_graphite2_tablelist_t *prev = nullptr;
-  hb_graphite2_tablelist_t *curr = tlist;
-  while (curr)
-  {
-    if (hb_blob_get_data(curr->blob, nullptr) == table_buffer)
-    {
-      if (prev == nullptr)
-        face_data->tlist.cmpexch(tlist, curr->next);
-      else
-        prev->next = curr->next;
-      hb_blob_destroy(curr->blob);
-      free(curr);
-      break;
-    }
-    prev = curr;
-    curr = curr->next;
-  }
-}
-
-static gr_face_ops hb_graphite2_face_ops = { sizeof(gr_face_ops), hb_graphite2_get_table, hb_graphite2_release_table };
-
 hb_graphite2_face_data_t *
 _hb_graphite2_shaper_face_data_create (hb_face_t *face)
 {
@@ -141,7 +113,7 @@ _hb_graphite2_shaper_face_data_create (hb_face_t *face)
     return nullptr;
 
   data->face = face;
-  data->grface = gr_make_face_with_ops (data, &hb_graphite2_face_ops, gr_face_preloadAll);
+  data->grface = gr_make_face (data, &hb_graphite2_get_table, gr_face_preloadAll);
 
   if (unlikely (!data->grface)) {
     free (data);
@@ -279,16 +251,11 @@ _hb_graphite2_shape (hb_shape_plan_t    *shape_plan,
 
   /* TODO ensure_native_direction. */
 
-  hb_tag_t script_tag[HB_OT_MAX_TAGS_PER_SCRIPT];
-  unsigned int count = HB_OT_MAX_TAGS_PER_SCRIPT;
-  hb_ot_tags_from_script_and_language (hb_buffer_get_script (buffer),
-				       HB_LANGUAGE_INVALID,
-				       &count,
-				       script_tag,
-				       nullptr, nullptr);
+  hb_tag_t script_tag[2];
+  hb_ot_tags_from_script (hb_buffer_get_script (buffer), &script_tag[0], &script_tag[1]);
 
   seg = gr_make_seg (nullptr, grface,
-		     count ? script_tag[count - 1] : HB_OT_TAG_DEFAULT_SCRIPT,
+		     script_tag[1] == HB_TAG_NONE ? script_tag[0] : script_tag[1],
 		     feats,
 		     gr_utf32, chars, buffer->len,
 		     2 | (hb_buffer_get_direction (buffer) == HB_DIRECTION_RTL ? 1 : 0));

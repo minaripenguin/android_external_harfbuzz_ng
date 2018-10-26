@@ -7,7 +7,7 @@ SUBDIRS = data
 
 # Convenience targets:
 lib:
-	@$(MAKE) $(AM_MAKEFLAGS) -C $(top_builddir)/src libs
+	@$(MAKE) $(AM_MAKEFLAGS) -C $(top_builddir)/src lib
 
 EXTRA_DIST += \
 	CMakeLists.txt \

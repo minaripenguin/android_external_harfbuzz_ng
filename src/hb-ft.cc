@@ -27,13 +27,12 @@
  * Google Author(s): Behdad Esfahbod
  */
 
-#include "hb.hh"
+#include "hb-private.hh"
 
 #include "hb-ft.h"
 
-#include "hb-font.hh"
-#include "hb-machinery.hh"
-#include "hb-cache.hh"
+#include "hb-font-private.hh"
+#include "hb-machinery-private.hh"
 
 #include FT_ADVANCES_H
 #include FT_MULTIPLE_MASTERS_H
@@ -45,29 +44,30 @@
  * In general, this file does a fine job of what it's supposed to do.
  * There are, however, things that need more work:
  *
+ *   - I remember seeing FT_Get_Advance() without the NO_HINTING flag to be buggy.
+ *     Have not investigated.
+ *
  *   - FreeType works in 26.6 mode.  Clients can decide to use that mode, and everything
  *     would work fine.  However, we also abuse this API for performing in font-space,
  *     but don't pass the correct flags to FreeType.  We just abuse the no-hinting mode
  *     for that, such that no rounding etc happens.  As such, we don't set ppem, and
  *     pass NO_HINTING as load_flags.  Would be much better to use NO_SCALE, and scale
- *     ourselves.
+ *     ourselves, like we do in uniscribe, etc.
  *
  *   - We don't handle / allow for emboldening / obliqueing.
  *
  *   - In the future, we should add constructors to create fonts in font space?
+ *
+ *   - FT_Load_Glyph() is extremely costly.  Do something about it?
  */
 
 
 struct hb_ft_font_t
 {
-  mutable hb_mutex_t lock;
   FT_Face ft_face;
   int load_flags;
   bool symbol; /* Whether selected cmap is symbol cmap. */
   bool unref; /* Whether to destroy ft_face when done. */
-
-  mutable hb_atomic_int_t cached_x_scale;
-  mutable hb_advance_cache_t advance_cache;
 };
 
 static hb_ft_font_t *
@@ -78,15 +78,11 @@ _hb_ft_font_create (FT_Face ft_face, bool symbol, bool unref)
   if (unlikely (!ft_font))
     return nullptr;
 
-  ft_font->lock.init ();
   ft_font->ft_face = ft_face;
   ft_font->symbol = symbol;
   ft_font->unref = unref;
 
   ft_font->load_flags = FT_LOAD_DEFAULT | FT_LOAD_NO_HINTING;
-
-  ft_font->cached_x_scale.set (0);
-  ft_font->advance_cache.init ();
 
   return ft_font;
 }
@@ -102,12 +98,8 @@ _hb_ft_font_destroy (void *data)
 {
   hb_ft_font_t *ft_font = (hb_ft_font_t *) data;
 
-  ft_font->advance_cache.fini ();
-
   if (ft_font->unref)
     _hb_ft_face_destroy (ft_font->ft_face);
-
-  ft_font->lock.fini ();
 
   free (ft_font);
 }
@@ -176,7 +168,6 @@ hb_ft_get_nominal_glyph (hb_font_t *font HB_UNUSED,
 			 void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
   unsigned int g = FT_Get_Char_Index (ft_font->ft_face, unicode);
 
   if (unlikely (!g))
@@ -200,32 +191,6 @@ hb_ft_get_nominal_glyph (hb_font_t *font HB_UNUSED,
   return true;
 }
 
-static unsigned int
-hb_ft_get_nominal_glyphs (hb_font_t *font HB_UNUSED,
-			  void *font_data,
-			  unsigned int count,
-			  const hb_codepoint_t *first_unicode,
-			  unsigned int unicode_stride,
-			  hb_codepoint_t *first_glyph,
-			  unsigned int glyph_stride,
-			  void *user_data HB_UNUSED)
-{
-  const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
-  unsigned int done;
-  for (done = 0;
-       done < count && (*first_glyph = FT_Get_Char_Index (ft_font->ft_face, *first_unicode));
-       done++)
-  {
-    first_unicode = &StructAtOffset<hb_codepoint_t> (first_unicode, unicode_stride);
-    first_glyph = &StructAtOffset<hb_codepoint_t> (first_glyph, glyph_stride);
-  }
-  /* We don't need to do ft_font->symbol dance here, since HB calls the singular
-   * nominal_glyph() for what we don't handle here. */
-  return done;
-}
-
-
 static hb_bool_t
 hb_ft_get_variation_glyph (hb_font_t *font HB_UNUSED,
 			   void *font_data,
@@ -235,7 +200,6 @@ hb_ft_get_variation_glyph (hb_font_t *font HB_UNUSED,
 			   void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
   unsigned int g = FT_Face_GetCharVariantIndex (ft_font->ft_face, unicode, variation_selector);
 
   if (unlikely (!g))
@@ -245,45 +209,22 @@ hb_ft_get_variation_glyph (hb_font_t *font HB_UNUSED,
   return true;
 }
 
-static void
-hb_ft_get_glyph_h_advances (hb_font_t* font, void* font_data,
-			    unsigned count,
-			    const hb_codepoint_t *first_glyph,
-			    unsigned glyph_stride,
-			    hb_position_t *first_advance,
-			    unsigned advance_stride,
-			    void *user_data HB_UNUSED)
+static hb_position_t
+hb_ft_get_glyph_h_advance (hb_font_t *font,
+			   void *font_data,
+			   hb_codepoint_t glyph,
+			   void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
-  FT_Face ft_face = ft_font->ft_face;
-  int load_flags = ft_font->load_flags;
-  int mult = font->x_scale < 0 ? -1 : +1;
+  FT_Fixed v;
 
-  if (font->x_scale != ft_font->cached_x_scale.get ())
-  {
-    ft_font->advance_cache.clear ();
-    ft_font->cached_x_scale.set (font->x_scale);
-  }
+  if (unlikely (FT_Get_Advance (ft_font->ft_face, glyph, ft_font->load_flags, &v)))
+    return 0;
 
-  for (unsigned int i = 0; i < count; i++)
-  {
-    FT_Fixed v = 0;
-    hb_codepoint_t glyph = *first_glyph;
+  if (font->x_scale < 0)
+    v = -v;
 
-    unsigned int cv;
-    if (ft_font->advance_cache.get (glyph, &cv))
-      v = cv;
-    else
-    {
-      FT_Get_Advance (ft_face, glyph, load_flags, &v);
-      ft_font->advance_cache.set (glyph, v);
-    }
-
-    *first_advance = (v * mult + (1<<9)) >> 10;
-    first_glyph = &StructAtOffset<hb_codepoint_t> (first_glyph, glyph_stride);
-    first_advance = &StructAtOffset<hb_position_t> (first_advance, advance_stride);
-  }
+  return (v + (1<<9)) >> 10;
 }
 
 static hb_position_t
@@ -293,7 +234,6 @@ hb_ft_get_glyph_v_advance (hb_font_t *font,
 			   void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
   FT_Fixed v;
 
   if (unlikely (FT_Get_Advance (ft_font->ft_face, glyph, ft_font->load_flags | FT_LOAD_VERTICAL_LAYOUT, &v)))
@@ -316,7 +256,6 @@ hb_ft_get_glyph_v_origin (hb_font_t *font,
 			  void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
   FT_Face ft_face = ft_font->ft_face;
 
   if (unlikely (FT_Load_Glyph (ft_face, glyph, ft_font->load_flags)))
@@ -335,6 +274,23 @@ hb_ft_get_glyph_v_origin (hb_font_t *font,
   return true;
 }
 
+static hb_position_t
+hb_ft_get_glyph_h_kerning (hb_font_t *font,
+			   void *font_data,
+			   hb_codepoint_t left_glyph,
+			   hb_codepoint_t right_glyph,
+			   void *user_data HB_UNUSED)
+{
+  const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
+  FT_Vector kerningv;
+
+  FT_Kerning_Mode mode = font->x_ppem ? FT_KERNING_DEFAULT : FT_KERNING_UNFITTED;
+  if (FT_Get_Kerning (ft_font->ft_face, left_glyph, right_glyph, mode, &kerningv))
+    return 0;
+
+  return kerningv.x;
+}
+
 static hb_bool_t
 hb_ft_get_glyph_extents (hb_font_t *font,
 			 void *font_data,
@@ -343,7 +299,6 @@ hb_ft_get_glyph_extents (hb_font_t *font,
 			 void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
   FT_Face ft_face = ft_font->ft_face;
 
   if (unlikely (FT_Load_Glyph (ft_face, glyph, ft_font->load_flags)))
@@ -376,7 +331,6 @@ hb_ft_get_glyph_contour_point (hb_font_t *font HB_UNUSED,
 			       void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
   FT_Face ft_face = ft_font->ft_face;
 
   if (unlikely (FT_Load_Glyph (ft_face, glyph, ft_font->load_flags)))
@@ -402,10 +356,8 @@ hb_ft_get_glyph_name (hb_font_t *font HB_UNUSED,
 		      void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
-  FT_Face ft_face = ft_font->ft_face;
 
-  hb_bool_t ret = !FT_Get_Glyph_Name (ft_face, glyph, name, size);
+  hb_bool_t ret = !FT_Get_Glyph_Name (ft_font->ft_face, glyph, name, size);
   if (ret && (size && !*name))
     ret = false;
 
@@ -420,7 +372,6 @@ hb_ft_get_glyph_from_name (hb_font_t *font HB_UNUSED,
 			   void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
   FT_Face ft_face = ft_font->ft_face;
 
   if (len < 0)
@@ -453,7 +404,6 @@ hb_ft_get_font_h_extents (hb_font_t *font HB_UNUSED,
 			  void *user_data HB_UNUSED)
 {
   const hb_ft_font_t *ft_font = (const hb_ft_font_t *) font_data;
-  hb_lock_t lock (ft_font->lock);
   FT_Face ft_face = ft_font->ft_face;
   metrics->ascender = ft_face->size->metrics.ascender;
   metrics->descender = ft_face->size->metrics.descender;
@@ -467,9 +417,7 @@ hb_ft_get_font_h_extents (hb_font_t *font HB_UNUSED,
   return true;
 }
 
-#ifdef HB_USE_ATEXIT
 static void free_static_ft_funcs (void);
-#endif
 
 static struct hb_ft_font_funcs_lazy_loader_t : hb_font_funcs_lazy_loader_t<hb_ft_font_funcs_lazy_loader_t>
 {
@@ -480,12 +428,13 @@ static struct hb_ft_font_funcs_lazy_loader_t : hb_font_funcs_lazy_loader_t<hb_ft
     hb_font_funcs_set_font_h_extents_func (funcs, hb_ft_get_font_h_extents, nullptr, nullptr);
     //hb_font_funcs_set_font_v_extents_func (funcs, hb_ft_get_font_v_extents, nullptr, nullptr);
     hb_font_funcs_set_nominal_glyph_func (funcs, hb_ft_get_nominal_glyph, nullptr, nullptr);
-    hb_font_funcs_set_nominal_glyphs_func (funcs, hb_ft_get_nominal_glyphs, nullptr, nullptr);
     hb_font_funcs_set_variation_glyph_func (funcs, hb_ft_get_variation_glyph, nullptr, nullptr);
-    hb_font_funcs_set_glyph_h_advances_func (funcs, hb_ft_get_glyph_h_advances, nullptr, nullptr);
+    hb_font_funcs_set_glyph_h_advance_func (funcs, hb_ft_get_glyph_h_advance, nullptr, nullptr);
     hb_font_funcs_set_glyph_v_advance_func (funcs, hb_ft_get_glyph_v_advance, nullptr, nullptr);
     //hb_font_funcs_set_glyph_h_origin_func (funcs, hb_ft_get_glyph_h_origin, nullptr, nullptr);
     hb_font_funcs_set_glyph_v_origin_func (funcs, hb_ft_get_glyph_v_origin, nullptr, nullptr);
+    hb_font_funcs_set_glyph_h_kerning_func (funcs, hb_ft_get_glyph_h_kerning, nullptr, nullptr);
+    //hb_font_funcs_set_glyph_v_kerning_func (funcs, hb_ft_get_glyph_v_kerning, nullptr, nullptr);
     hb_font_funcs_set_glyph_extents_func (funcs, hb_ft_get_glyph_extents, nullptr, nullptr);
     hb_font_funcs_set_glyph_contour_point_func (funcs, hb_ft_get_glyph_contour_point, nullptr, nullptr);
     hb_font_funcs_set_glyph_name_func (funcs, hb_ft_get_glyph_name, nullptr, nullptr);
@@ -733,9 +682,8 @@ hb_ft_font_create_referenced (FT_Face ft_face)
   return hb_ft_font_create (ft_face, _hb_ft_face_destroy);
 }
 
-#ifdef HB_USE_ATEXIT
+
 static void free_static_ft_library (void);
-#endif
 
 static struct hb_ft_library_lazy_loader_t : hb_lazy_loader_t<hb_remove_ptr_t<FT_Library>::value,
 							     hb_ft_library_lazy_loader_t>

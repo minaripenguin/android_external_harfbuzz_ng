@@ -28,9 +28,9 @@
 #ifndef HB_AAT_LAYOUT_TRAK_TABLE_HH
 #define HB_AAT_LAYOUT_TRAK_TABLE_HH
 
-#include "hb-aat-layout-common.hh"
-#include "hb-ot-layout.hh"
-#include "hb-open-type.hh"
+#include "hb-aat-layout-common-private.hh"
+#include "hb-ot-layout-private.hh"
+#include "hb-open-type-private.hh"
 
 /*
  * trak -- Tracking
@@ -46,33 +46,29 @@ struct TrackTableEntry
 {
   friend struct TrackData;
 
+  inline bool sanitize (hb_sanitize_context_t *c, const void *base,
+			unsigned int size) const
+  {
+    TRACE_SANITIZE (this);
+    return_trace (likely (c->check_struct (this) &&
+			  (valuesZ.sanitize (c, base, size))));
+  }
+
+  private:
   inline float get_track_value () const
   {
     return track.to_float ();
   }
 
-  inline int get_value (const void *base,
-			unsigned int index,
-			unsigned int nSizes) const
+  inline int get_value (const void *base, unsigned int index) const
   {
-    return hb_array_t<FWORD> ((base+valuesZ).arrayZ, nSizes)[index];
-  }
-
-  public:
-  inline bool sanitize (hb_sanitize_context_t *c, const void *base,
-			unsigned int nSizes) const
-  {
-    TRACE_SANITIZE (this);
-    return_trace (likely (c->check_struct (this) &&
-			  (valuesZ.sanitize (c, base, nSizes))));
+    return (base+valuesZ)[index];
   }
 
   protected:
   Fixed		track;		/* Track value for this record. */
-  NameID	trackNameID;	/* The 'name' table index for this track.
-				 * (a short word or phrase like "loose"
-				 * or "very tight") */
-  OffsetTo<UnsizedArrayOf<FWORD>, HBUINT16, false>
+  NameID	trackNameID;	/* The 'name' table index for this track */
+  OffsetTo<UnsizedArrayOf<FWORD> >
 		valuesZ;	/* Offset from start of tracking table to
 				 * per-size tracking values for this track. */
 
@@ -82,68 +78,6 @@ struct TrackTableEntry
 
 struct TrackData
 {
-  inline float interpolate_at (unsigned int idx,
-			       float target_size,
-			       const TrackTableEntry &trackTableEntry,
-			       const void *base) const
-  {
-    unsigned int sizes = nSizes;
-    hb_array_t<Fixed> size_table ((base+sizeTable).arrayZ, sizes);
-
-    float s0 = size_table[idx].to_float ();
-    float s1 = size_table[idx + 1].to_float ();
-    float t = unlikely (s0 == s1) ? 0.f : (target_size - s0) / (s1 - s0);
-    return t * trackTableEntry.get_value (base, idx + 1, sizes) +
-	   (1.f - t) * trackTableEntry.get_value (base, idx, sizes);
-  }
-
-  inline int get_tracking (const void *base, float ptem) const
-  {
-    /* CoreText points are CSS pixels (96 per inch),
-     * NOT typographic points (72 per inch).
-     *
-     * https://developer.apple.com/library/content/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Explained/Explained.html
-     */
-    float csspx = ptem * 96.f / 72.f;
-
-    /*
-     * Choose track.
-     */
-    const TrackTableEntry *trackTableEntry = nullptr;
-    unsigned int count = nTracks;
-    for (unsigned int i = 0; i < count; i++)
-    {
-      /* Note: Seems like the track entries are sorted by values.  But the
-       * spec doesn't explicitly say that.  It just mentions it in the example. */
-
-      /* For now we only seek for track entries with zero tracking value */
-
-      if (trackTable[i].get_track_value () == 0.f)
-      {
-	trackTableEntry = &trackTable[i];
-	break;
-      }
-    }
-    if (!trackTableEntry) return 0.;
-
-    /*
-     * Choose size.
-     */
-    unsigned int sizes = nSizes;
-    if (!sizes) return 0.;
-    if (sizes == 1) return trackTableEntry->get_value (base, 0, sizes);
-
-    /* TODO bfind() */
-    hb_array_t<Fixed> size_table ((base+sizeTable).arrayZ, sizes);
-    unsigned int size_index;
-    for (size_index = 0; size_index < sizes - 1; size_index++)
-      if (size_table[size_index].to_float () >= csspx)
-        break;
-
-    return round (interpolate_at (size_index ? size_index - 1 : 0, csspx,
-				  *trackTableEntry, base));
-  }
-
   inline bool sanitize (hb_sanitize_context_t *c, const void *base) const
   {
     TRACE_SANITIZE (this);
@@ -152,12 +86,56 @@ struct TrackData
 		  trackTable.sanitize (c, nTracks, base, nSizes));
   }
 
+  inline float get_tracking (const void *base, float ptem) const
+  {
+    /* CoreText points are CSS pixels (96 per inch),
+     * NOT typographic points (72 per inch).
+     *
+     * https://developer.apple.com/library/content/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Explained/Explained.html
+     */
+    float csspx = ptem * 96.f / 72.f;
+    Fixed fixed_size;
+    fixed_size.set_float (csspx);
+
+    /* XXX Clean this up. Make it work with nSizes==1 and 0. */
+
+    unsigned int sizes = nSizes;
+
+    const TrackTableEntry *trackTableEntry = nullptr;
+    for (unsigned int i = 0; i < sizes; ++i)
+      // For now we only seek for track entries with zero tracking value
+      if (trackTable[i].get_track_value () == 0.f)
+        trackTableEntry = &trackTable[0];
+
+    // We couldn't match any, exit
+    if (!trackTableEntry) return 0.;
+
+    /* TODO bfind() */
+    unsigned int size_index;
+    UnsizedArrayOf<Fixed> size_table = base+sizeTable;
+    for (size_index = 0; size_index < sizes; ++size_index)
+      if (size_table[size_index] >= fixed_size)
+        break;
+
+    // TODO(ebraminio): We don't attempt to extrapolate to larger or
+    // smaller values for now but we should do, per spec
+    if (size_index == sizes)
+      return trackTableEntry->get_value (base, sizes - 1);
+    if (size_index == 0 || size_table[size_index] == fixed_size)
+      return trackTableEntry->get_value (base, size_index);
+
+    float s0 = size_table[size_index - 1].to_float ();
+    float s1 = size_table[size_index].to_float ();
+    float t = (csspx - s0) / (s1 - s0);
+    return (float) t * trackTableEntry->get_value (base, size_index) +
+	   ((float) 1.0 - t) * trackTableEntry->get_value (base, size_index - 1);
+  }
+
   protected:
   HBUINT16	nTracks;	/* Number of separate tracks included in this table. */
   HBUINT16	nSizes;		/* Number of point sizes included in this table. */
-  LOffsetTo<UnsizedArrayOf<Fixed>, false>
-		sizeTable;	/* Offset from start of the tracking table to
-				 * Array[nSizes] of size values.. */
+  LOffsetTo<UnsizedArrayOf<Fixed> >
+		sizeTable;	/* Offset to array[nSizes] of size values. */
   UnsizedArrayOf<TrackTableEntry>
 		trackTable;	/* Array[nTracks] of TrackTableEntry records. */
 
@@ -168,8 +146,6 @@ struct TrackData
 struct trak
 {
   static const hb_tag_t tableTag = HB_AAT_TAG_trak;
-
-  inline bool has_data (void) const { return version.to_int () != 0; }
 
   inline bool sanitize (hb_sanitize_context_t *c) const
   {
@@ -192,25 +168,25 @@ struct trak
     if (HB_DIRECTION_IS_HORIZONTAL (buffer->props.direction))
     {
       const TrackData &trackData = this+horizData;
-      int tracking = trackData.get_tracking (this, ptem);
-      hb_position_t offset_to_add = c->font->em_scalef_x (tracking / 2);
-      hb_position_t advance_to_add = c->font->em_scalef_x (tracking);
+      float tracking = trackData.get_tracking (this, ptem);
+      hb_position_t advance_to_add = c->font->em_scalef_x (tracking / 2);
       foreach_grapheme (buffer, start, end)
       {
+	buffer->pos[start].x_offset += advance_to_add;
 	buffer->pos[start].x_advance += advance_to_add;
-	buffer->pos[start].x_offset += offset_to_add;
+	buffer->pos[end].x_advance += advance_to_add;
       }
     }
     else
     {
       const TrackData &trackData = this+vertData;
-      int tracking = trackData.get_tracking (this, ptem);
-      hb_position_t offset_to_add = c->font->em_scalef_y (tracking / 2);
-      hb_position_t advance_to_add = c->font->em_scalef_y (tracking);
+      float tracking = trackData.get_tracking (this, ptem);
+      hb_position_t advance_to_add = c->font->em_scalef_y (tracking / 2);
       foreach_grapheme (buffer, start, end)
       {
+	buffer->pos[start].y_offset += advance_to_add;
 	buffer->pos[start].y_advance += advance_to_add;
-	buffer->pos[start].y_offset += offset_to_add;
+	buffer->pos[end].y_advance += advance_to_add;
       }
     }
 
@@ -218,17 +194,15 @@ struct trak
   }
 
   protected:
-  FixedVersion<>	version;	/* Version of the tracking table
-					 * (0x00010000u for version 1.0). */
-  HBUINT16		format; 	/* Format of the tracking table (set to 0). */
-  OffsetTo<TrackData>	horizData;	/* Offset from start of tracking table to TrackData
-					 * for horizontal text (or 0 if none). */
-  OffsetTo<TrackData>	vertData;	/* Offset from start of tracking table to TrackData
-					 * for vertical text (or 0 if none). */
+  FixedVersion<>	version;	/* Version of the tracking table--currently
+					 * 0x00010000u for version 1.0. */
+  HBUINT16		format; 	/* Format of the tracking table */
+  OffsetTo<TrackData>	horizData;	/* TrackData for horizontal text */
+  OffsetTo<TrackData>	vertData;	/* TrackData for vertical text */
   HBUINT16		reserved;	/* Reserved. Set to 0. */
 
   public:
-  DEFINE_SIZE_STATIC (12);
+  DEFINE_SIZE_MIN (12);
 };
 
 } /* namespace AAT */

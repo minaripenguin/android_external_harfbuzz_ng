@@ -27,7 +27,7 @@
 #ifndef HELPER_CAIRO_HH
 #define HELPER_CAIRO_HH
 
-#include "hb.hh"
+#include "hb-private.hh"
 #include "options.hh"
 
 #include <cairo.h>
