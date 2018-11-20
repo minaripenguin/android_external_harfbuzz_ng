@@ -114,8 +114,7 @@ cc_library_shared {
 
     shared_libs: [
         "libcutils",
-        "libicuuc",
-        "libicui18n",
+        "libandroidicu",
         "liblog",
     ],
 
