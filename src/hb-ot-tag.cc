@@ -242,7 +242,6 @@ hb_ot_tag_from_language (hb_language_t language)
 static void
 hb_ot_tags_from_language (const char   *lang_str,
 			  const char   *limit,
-			  const char   *private_use_subtag,
 			  unsigned int *count,
 			  hb_tag_t     *tags)
 {
@@ -389,7 +388,7 @@ hb_ot_tags_from_script_and_language (hb_script_t   script,
     needs_language = parse_private_use_subtag (private_use_subtag, language_count, language_tags, "-hbot", TOUPPER);
 
     if (needs_language && language_count && language_tags && *language_count)
-      hb_ot_tags_from_language (lang_str, limit, private_use_subtag, language_count, language_tags);
+      hb_ot_tags_from_language (lang_str, limit, language_count, language_tags);
   }
 
   if (needs_script && script_count && script_tags && *script_count)
@@ -504,7 +503,7 @@ hb_ot_tags_to_script_and_language (hb_tag_t       script_tag,
 
 #ifdef MAIN
 static inline void
-test_langs_sorted (void)
+test_langs_sorted ()
 {
   for (unsigned int i = 1; i < ARRAY_LENGTH (ot_languages); i++)
   {
@@ -519,7 +518,7 @@ test_langs_sorted (void)
 }
 
 int
-main (void)
+main ()
 {
   test_langs_sorted ();
   return 0;

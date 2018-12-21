@@ -27,7 +27,7 @@
  */
 
 #include "hb-ot-map.hh"
-
+#include "hb-ot-shape.hh"
 #include "hb-ot-layout.hh"
 
 
@@ -68,7 +68,7 @@ hb_ot_map_builder_t::hb_ot_map_builder_t (hb_face_t *face_,
   }
 }
 
-hb_ot_map_builder_t::~hb_ot_map_builder_t (void)
+hb_ot_map_builder_t::~hb_ot_map_builder_t ()
 {
   feature_infos.fini ();
   for (unsigned int table_index = 0; table_index < 2; table_index++)
@@ -79,8 +79,8 @@ void hb_ot_map_builder_t::add_feature (hb_tag_t tag,
 				       hb_ot_map_feature_flags_t flags,
 				       unsigned int value)
 {
-  feature_info_t *info = feature_infos.push();
   if (unlikely (!tag)) return;
+  feature_info_t *info = feature_infos.push();
   info->tag = tag;
   info->seq = feature_infos.len;
   info->max_value = value;
@@ -143,9 +143,8 @@ void hb_ot_map_builder_t::add_pause (unsigned int table_index, hb_ot_map_t::paus
 }
 
 void
-hb_ot_map_builder_t::compile (hb_ot_map_t  &m,
-			      const int    *coords,
-			      unsigned int  num_coords)
+hb_ot_map_builder_t::compile (hb_ot_map_t                  &m,
+			      const hb_ot_shape_plan_key_t &key)
 {
   static_assert ((!(HB_GLYPH_FLAG_DEFINED & (HB_GLYPH_FLAG_DEFINED + 1))), "");
   unsigned int global_bit_mask = HB_GLYPH_FLAG_DEFINED + 1;
@@ -175,6 +174,7 @@ hb_ot_map_builder_t::compile (hb_ot_map_t  &m,
   }
 
   /* Sort features and merge duplicates */
+  if (feature_infos.len)
   {
     feature_infos.qsort ();
     unsigned int j = 0;
@@ -281,13 +281,6 @@ hb_ot_map_builder_t::compile (hb_ot_map_t  &m,
   {
     /* Collect lookup indices for features */
 
-    unsigned int variations_index;
-    hb_ot_layout_table_find_feature_variations (face,
-						table_tags[table_index],
-						coords,
-						num_coords,
-						&variations_index);
-
     unsigned int stage_index = 0;
     unsigned int last_num_lookups = 0;
     for (unsigned stage = 0; stage < current_stage[table_index]; stage++)
@@ -296,14 +289,14 @@ hb_ot_map_builder_t::compile (hb_ot_map_t  &m,
 	  required_feature_stage[table_index] == stage)
 	add_lookups (m, table_index,
 		     required_feature_index[table_index],
-		     variations_index,
+		     key.variations_index[table_index],
 		     global_bit_mask);
 
       for (unsigned i = 0; i < m.features.len; i++)
         if (m.features[i].stage[table_index] == stage)
 	  add_lookups (m, table_index,
 		       m.features[i].index[table_index],
-		       variations_index,
+		       key.variations_index[table_index],
 		       m.features[i].mask,
 		       m.features[i].auto_zwnj,
 		       m.features[i].auto_zwj,
