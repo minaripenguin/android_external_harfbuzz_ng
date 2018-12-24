@@ -52,6 +52,9 @@ if (HB_BUILD_UTILS)
   set (HB_HAVE_FREETYPE ON)
 endif ()
 
+option(HB_BUILD_SUBSET "Build harfbuzz-subset" ON)
+option(HB_BUILD_TESTS "Build harfbuzz tests" ON)
+
 option(HB_HAVE_GOBJECT "Enable GObject Bindings" OFF)
 if (HB_HAVE_GOBJECT)
   set (HB_HAVE_GLIB ON)
@@ -80,16 +83,6 @@ if (HB_CHECK)
   elseif (APPLE)
     set (HB_HAVE_CORETEXT ON)
   endif ()
-endif ()
-
-set (HB_DISABLE_SUBSET OFF)
-set (HB_DISABLE_TESTS OFF)
-option(HB_IOS "Apply iOS specific build flags" OFF)
-if (HB_IOS)
-  # We should fix their issue and enable them
-  set (HB_DISABLE_SUBSET ON)
-  set (HB_DISABLE_TESTS ON)
-  set (HB_HAVE_CORETEXT OFF)
 endif ()
 
 include_directories(AFTER
@@ -175,10 +168,6 @@ extract_make_variable(HB_BASE_headers ${SRCSOURCES})
 add_prefix_to_list(HB_BASE_headers "${PROJECT_SOURCE_DIR}/src/")
 extract_make_variable(HB_FALLBACK_sources ${SRCSOURCES})
 add_prefix_to_list(HB_FALLBACK_sources "${PROJECT_SOURCE_DIR}/src/")
-extract_make_variable(HB_OT_sources ${SRCSOURCES})
-add_prefix_to_list(HB_OT_sources "${PROJECT_SOURCE_DIR}/src/")
-extract_make_variable(HB_OT_headers ${SRCSOURCES})
-add_prefix_to_list(HB_OT_headers "${PROJECT_SOURCE_DIR}/src/")
 
 extract_make_variable(HB_SUBSET_sources ${SRCSOURCES})
 add_prefix_to_list(HB_SUBSET_sources "${PROJECT_SOURCE_DIR}/src/")
@@ -187,13 +176,10 @@ extract_make_variable(HB_SUBSET_headers ${SRCSOURCES})
 add_prefix_to_list(HB_SUBSET_headers "${PROJECT_SOURCE_DIR}/src/")
 
 extract_make_variable(HB_BASE_RAGEL_GENERATED_sources ${SRCSOURCES})
-extract_make_variable(HB_OT_RAGEL_GENERATED_sources ${SRCSOURCES})
 #if (IN_HB_DIST)
   add_prefix_to_list(HB_BASE_RAGEL_GENERATED_sources "${PROJECT_SOURCE_DIR}/src/")
-  add_prefix_to_list(HB_OT_RAGEL_GENERATED_sources "${PROJECT_SOURCE_DIR}/src/")
 #else ()
 #  add_prefix_to_list(HB_BASE_RAGEL_GENERATED_sources "${PROJECT_BINARY_DIR}/src/")
-#  add_prefix_to_list(HB_OT_RAGEL_GENERATED_sources "${PROJECT_BINARY_DIR}/src/")
 #endif ()
 
 extract_make_variable(HB_VIEW_sources ${UTILSOURCES})
@@ -219,7 +205,7 @@ set (HB_VERSION_MICRO ${CMAKE_MATCH_4})
 
 ## Define ragel tasks
 # if (NOT IN_HB_DIST)
-#  foreach (ragel_output IN ITEMS ${HB_BASE_RAGEL_GENERATED_sources} ${HB_OT_RAGEL_GENERATED_sources})
+#  foreach (ragel_output IN ITEMS ${HB_BASE_RAGEL_GENERATED_sources})
 #    string(REGEX MATCH "([^/]+)\\.hh" temp ${ragel_output})
 #    set (target_name ${CMAKE_MATCH_1})
 #    add_custom_command(OUTPUT ${ragel_output}
@@ -253,8 +239,6 @@ set (project_sources
   ${HB_BASE_RAGEL_GENERATED_sources}
 
   ${HB_FALLBACK_sources}
-  ${HB_OT_sources}
-  ${HB_OT_RAGEL_GENERATED_sources}
 )
 
 set (subset_project_sources
@@ -267,7 +251,6 @@ set (project_headers
   #${HB_VERSION_H}
 
   ${HB_BASE_headers}
-  ${HB_OT_headers}
 )
 
 set (subset_project_headers
@@ -556,7 +539,7 @@ add_library(harfbuzz ${project_sources} ${project_extra_sources} ${project_heade
 target_link_libraries(harfbuzz ${THIRD_PARTY_LIBS})
 
 ## Define harfbuzz-subset library
-if (NOT HB_DISABLE_SUBSET)
+if (HB_BUILD_SUBSET)
   add_library(harfbuzz-subset ${subset_project_sources} ${subset_project_headers})
   add_dependencies(harfbuzz-subset harfbuzz)
   target_link_libraries(harfbuzz-subset harfbuzz ${THIRD_PARTY_LIBS})
@@ -580,7 +563,7 @@ if (UNIX OR MINGW)
     set (CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "m") # libm
     set (CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
     set_target_properties(harfbuzz PROPERTIES LINKER_LANGUAGE C)
-    if (NOT HB_DISABLE_SUBSET)
+    if (HB_BUILD_SUBSET)
       set_target_properties(harfbuzz-subset PROPERTIES LINKER_LANGUAGE C)
     endif ()
 
@@ -713,6 +696,8 @@ if (HB_HAVE_INTROSPECTION)
       -DHB_H_IN
       -DHB_OT_H
       -DHB_OT_H_IN
+      -DHB_AAT_H
+      -DHB_AAT_H_IN
       -DHB_GOBJECT_H
       -DHB_GOBJECT_H_IN
       -DHB_EXTERN=
@@ -861,7 +846,7 @@ if (UNIX AND CMAKE_GENERATOR STREQUAL "Ninja")
 endif ()
 
 
-if (NOT HB_DISABLE_TESTS)
+if (HB_BUILD_TESTS)
   ## src/ executables
   foreach (prog main test test-would-substitute test-size-params test-buffer-serialize hb-ot-tag test-unicode-ranges)
     set (prog_name ${prog})
