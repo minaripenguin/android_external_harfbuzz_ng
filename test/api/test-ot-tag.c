@@ -60,7 +60,7 @@ test_script_tags_from_language (const char *s, const char *lang_s, hb_script_t s
 {
   hb_script_t tag;
   unsigned int count = 1;
-  hb_script_t t;
+  hb_tag_t t;
 
   g_test_message ("Testing script %c%c%c%c: script tag %s, language tag %s", HB_UNTAG (hb_script_to_iso15924_tag (script)), s, lang_s);
   tag = hb_tag_from_string (s, -1);
@@ -78,7 +78,7 @@ static void
 test_indic_tags (const char *s1, const char *s2, const char *s3, hb_script_t script)
 {
   hb_script_t tag1, tag2, tag3;
-  hb_script_t t[3];
+  hb_tag_t t[3];
   unsigned int count = 3;
 
   g_test_message ("Testing script %c%c%c%c: USE tag %s, new tag %s, old tag %s", HB_UNTAG (hb_script_to_iso15924_tag (script)), s1, s2, s3);
@@ -103,7 +103,7 @@ test_indic_tags (const char *s1, const char *s2, const char *s3, hb_script_t scr
 static void
 test_ot_tag_script_degenerate (void)
 {
-  hb_script_t t[2];
+  hb_tag_t t[2];
   unsigned int count = 2;
 
   g_assert_cmphex (HB_TAG_CHAR4 ("DFLT"), ==, HB_OT_TAG_DEFAULT_SCRIPT);
@@ -202,11 +202,11 @@ test_language_two_way (const char *tag_s, const char *lang_s)
 {
   hb_language_t lang = hb_language_from_string (lang_s, -1);
   hb_tag_t tag = hb_tag_from_string (tag_s, -1);
+  hb_tag_t tag2;
+  unsigned int count = 1;
 
   g_test_message ("Testing language %s <-> tag %s", lang_s, tag_s);
 
-  hb_tag_t tag2;
-  unsigned int count = 1;
   hb_ot_tags_from_script_and_language (HB_SCRIPT_INVALID,
 				       lang,
 				       NULL, NULL, &count, &tag2);
@@ -223,11 +223,11 @@ test_tag_from_language (const char *tag_s, const char *lang_s)
 {
   hb_language_t lang = hb_language_from_string (lang_s, -1);
   hb_tag_t tag = hb_tag_from_string (tag_s, -1);
+  hb_tag_t tag2;
+  unsigned int count = 1;
 
   g_test_message ("Testing language %s -> tag %s", lang_s, tag_s);
 
-  hb_tag_t tag2;
-  unsigned int count = 1;
   hb_ot_tags_from_script_and_language (HB_SCRIPT_INVALID,
 				       lang,
 				       NULL, NULL, &count, &tag2);
@@ -449,6 +449,9 @@ test_ot_tag_language (void)
 
   /* A UN M.49 region code, not an extended language subtag */
   test_tag_from_language ("ARA", "ar-001");
+
+  /* An invalid tag */
+  test_tag_from_language ("TRK", "tr@foo=bar");
 }
 
 static void
@@ -464,9 +467,10 @@ test_tags (hb_script_t  script,
   unsigned int i;
   hb_tag_t *script_tags = malloc (script_count * sizeof (hb_tag_t));
   hb_tag_t *language_tags = malloc (language_count * sizeof (hb_tag_t));
+  hb_language_t lang;
   g_assert (script_tags);
   g_assert (language_tags);
-  hb_language_t lang = hb_language_from_string (lang_s, -1);
+  lang = hb_language_from_string (lang_s, -1);
   va_start (expected_tags, expected_language_count);
 
   hb_ot_tags_from_script_and_language (script, lang, &script_count, script_tags, &language_count, language_tags);
