@@ -26,14 +26,22 @@
  * Google Author(s): Behdad Esfahbod
  */
 
-#define HB_SHAPER coretext
-
 #include "hb.hh"
 #include "hb-shaper-impl.hh"
 
 #include "hb-coretext.h"
 #include "hb-aat-layout.hh"
 #include <math.h>
+
+
+/**
+ * SECTION:hb-coretext
+ * @title: hb-coretext
+ * @short_description: CoreText integration
+ * @include: hb-coretext.h
+ *
+ * Functions for using HarfBuzz with the CoreText fonts.
+ **/
 
 /* https://developer.apple.com/documentation/coretext/1508745-ctfontcreatewithgraphicsfont */
 #define HB_CORETEXT_DEFAULT_FONT_SIZE 12.f
@@ -91,13 +99,8 @@ _hb_cg_font_release (void *data)
 }
 
 
-HB_SHAPER_DATA_ENSURE_DEFINE(coretext, face)
-HB_SHAPER_DATA_ENSURE_DEFINE_WITH_CONDITION(coretext, font,
-	fabs (CTFontGetSize((CTFontRef) data) - coretext_font_size_from_ptem (font->ptem)) <= .5
-)
-
 static CTFontDescriptorRef
-get_last_resort_font_desc (void)
+get_last_resort_font_desc ()
 {
   // TODO Handle allocation failures?
   CTFontDescriptorRef last_resort = CTFontDescriptorCreateWithNameAndSize (CFSTR("LastResort"), 0);
@@ -302,8 +305,7 @@ hb_coretext_face_create (CGFontRef cg_font)
 CGFontRef
 hb_coretext_face_get_cg_font (hb_face_t *face)
 {
-  if (unlikely (!hb_coretext_shaper_face_data_ensure (face))) return nullptr;
-  return (CGFontRef) HB_SHAPER_DATA_GET (face);
+  return (CGFontRef) (const void *) face->data.coretext;
 }
 
 
@@ -311,8 +313,9 @@ hb_coretext_font_data_t *
 _hb_coretext_shaper_font_data_create (hb_font_t *font)
 {
   hb_face_t *face = font->face;
-  if (unlikely (!hb_coretext_shaper_face_data_ensure (face))) return nullptr;
-  CGFontRef cg_font = (CGFontRef) HB_SHAPER_DATA_GET (face);
+  const hb_coretext_face_data_t *face_data = face->data.coretext;
+  if (unlikely (!face_data)) return nullptr;
+  CGFontRef cg_font = (CGFontRef) (const void *) face->data.coretext;
 
   CTFontRef ct_font = create_ct_font (cg_font, coretext_font_size_from_ptem (font->ptem));
 
@@ -331,6 +334,38 @@ _hb_coretext_shaper_font_data_destroy (hb_coretext_font_data_t *data)
   CFRelease ((CTFontRef) data);
 }
 
+static const hb_coretext_font_data_t *
+hb_coretext_font_data_sync (hb_font_t *font)
+{
+retry:
+  const hb_coretext_font_data_t *data = font->data.coretext;
+  if (unlikely (!data)) return nullptr;
+
+  if (fabs (CTFontGetSize((CTFontRef) data) - coretext_font_size_from_ptem (font->ptem)) > .5)
+  {
+    /* XXX-MT-bug
+     * Note that evaluating condition above can be dangerous if another thread
+     * got here first and destructed data.  That's, as always, bad use pattern.
+     * If you modify the font (change font size), other threads must not be
+     * using it at the same time.  However, since this check is delayed to
+     * when one actually tries to shape something, this is a XXX race condition
+     * (and the only one we have that I know of) right now.  Ie. you modify the
+     * font size in one thread, then (supposedly safely) try to use it from two
+     * or more threads and BOOM!  I'm not sure how to fix this.  We want RCU.
+     */
+
+    /* Drop and recreate. */
+    /* If someone dropped it in the mean time, throw it away and don't touch it.
+     * Otherwise, destruct it. */
+    if (likely (font->data.coretext.cmpexch (const_cast<hb_coretext_font_data_t *> (data), nullptr)))
+      _hb_coretext_shaper_font_data_destroy (const_cast<hb_coretext_font_data_t *> (data));
+    else
+      goto retry;
+  }
+  return font->data.coretext;
+}
+
+
 /*
  * Since: 1.7.2
  */
@@ -343,13 +378,13 @@ hb_coretext_font_create (CTFontRef ct_font)
   hb_font_t *font = hb_font_create (face);
   hb_face_destroy (face);
 
-  if (unlikely (hb_object_is_inert (font)))
+  if (unlikely (hb_object_is_immutable (font)))
     return font;
 
   hb_font_set_ptem (font, coretext_font_size_to_ptem (CTFontGetSize(ct_font)));
 
   /* Let there be dragons here... */
-  HB_SHAPER_DATA (HB_SHAPER, font).set_relaxed ((hb_coretext_font_data_t *) CFRetain (ct_font));
+  font->data.coretext.cmpexch (nullptr, (hb_coretext_font_data_t *) CFRetain (ct_font));
 
   return font;
 }
@@ -357,31 +392,8 @@ hb_coretext_font_create (CTFontRef ct_font)
 CTFontRef
 hb_coretext_font_get_ct_font (hb_font_t *font)
 {
-  if (unlikely (!hb_coretext_shaper_font_data_ensure (font))) return nullptr;
-  return (CTFontRef) HB_SHAPER_DATA_GET (font);
-}
-
-
-
-/*
- * shaper shape_plan data
- */
-
-struct hb_coretext_shape_plan_data_t {};
-
-hb_coretext_shape_plan_data_t *
-_hb_coretext_shaper_shape_plan_data_create (hb_shape_plan_t    *shape_plan HB_UNUSED,
-					     const hb_feature_t *user_features HB_UNUSED,
-					     unsigned int        num_user_features HB_UNUSED,
-					     const int          *coords HB_UNUSED,
-					     unsigned int        num_coords HB_UNUSED)
-{
-  return (hb_coretext_shape_plan_data_t *) HB_SHAPER_DATA_SUCCEEDED;
-}
-
-void
-_hb_coretext_shaper_shape_plan_data_destroy (hb_coretext_shape_plan_data_t *data HB_UNUSED)
-{
+  const hb_coretext_font_data_t *data = hb_coretext_font_data_sync (font);
+  return data ? (CTFontRef) data : nullptr;
 }
 
 
@@ -440,8 +452,8 @@ _hb_coretext_shape (hb_shape_plan_t    *shape_plan,
                     unsigned int        num_features)
 {
   hb_face_t *face = font->face;
-  CGFontRef cg_font = (CGFontRef) HB_SHAPER_DATA_GET (face);
-  CTFontRef ct_font = (CTFontRef) HB_SHAPER_DATA_GET (font);
+  CGFontRef cg_font = (CGFontRef) (const void *) face->data.coretext;
+  CTFontRef ct_font = (CTFontRef) hb_coretext_font_data_sync (font);
 
   CGFloat ct_font_size = CTFontGetSize (ct_font);
   CGFloat x_mult = (CGFloat) font->x_scale / ct_font_size;
@@ -464,8 +476,8 @@ _hb_coretext_shape (hb_shape_plan_t    *shape_plan,
 	buffer->merge_clusters (i - 1, i + 1);
   }
 
-  hb_auto_t<hb_vector_t<feature_record_t> > feature_records;
-  hb_auto_t<hb_vector_t<range_record_t> > range_records;
+  hb_vector_t<feature_record_t> feature_records;
+  hb_vector_t<range_record_t> range_records;
 
   /*
    * Set up features.
@@ -474,7 +486,7 @@ _hb_coretext_shape (hb_shape_plan_t    *shape_plan,
   if (num_features)
   {
     /* Sort features by start/end events. */
-    hb_auto_t<hb_vector_t<feature_event_t> > feature_events;
+    hb_vector_t<feature_event_t> feature_events;
     for (unsigned int i = 0; i < num_features; i++)
     {
       const hb_aat_feature_mapping_t * mapping = hb_aat_layout_find_feature_mapping (features[i].tag);
@@ -513,7 +525,7 @@ _hb_coretext_shape (hb_shape_plan_t    *shape_plan,
     }
 
     /* Scan events and save features for each range. */
-    hb_auto_t<hb_vector_t<active_feature_t> > active_features;
+    hb_vector_t<active_feature_t> active_features;
     unsigned int last_index = 0;
     for (unsigned int i = 0; i < feature_events.len; i++)
     {
@@ -586,7 +598,7 @@ _hb_coretext_shape (hb_shape_plan_t    *shape_plan,
       } else {
         active_feature_t *feature = active_features.find (&event->feature);
 	if (feature)
-	  active_features.remove (feature - active_features.arrayZ());
+	  active_features.remove (feature - active_features.arrayZ ());
       }
     }
   }
@@ -1142,9 +1154,6 @@ fail:
  * AAT shaper
  */
 
-HB_SHAPER_DATA_ENSURE_DEFINE(coretext_aat, face)
-HB_SHAPER_DATA_ENSURE_DEFINE(coretext_aat, font)
-
 /*
  * shaper face data
  */
@@ -1154,20 +1163,8 @@ struct hb_coretext_aat_face_data_t {};
 hb_coretext_aat_face_data_t *
 _hb_coretext_aat_shaper_face_data_create (hb_face_t *face)
 {
-  static const hb_tag_t tags[] = {HB_CORETEXT_TAG_MORX, HB_CORETEXT_TAG_MORT, HB_CORETEXT_TAG_KERX};
-
-  for (unsigned int i = 0; i < ARRAY_LENGTH (tags); i++)
-  {
-    hb_blob_t *blob = face->reference_table (tags[i]);
-    if (hb_blob_get_length (blob))
-    {
-      hb_blob_destroy (blob);
-      return hb_coretext_shaper_face_data_ensure (face) ? (hb_coretext_aat_face_data_t *) HB_SHAPER_DATA_SUCCEEDED : nullptr;
-    }
-    hb_blob_destroy (blob);
-  }
-
-  return nullptr;
+  return hb_aat_layout_has_substitution (face) || hb_aat_layout_has_positioning (face) ?
+	 (hb_coretext_aat_face_data_t *) HB_SHAPER_DATA_SUCCEEDED : nullptr;
 }
 
 void
@@ -1185,33 +1182,11 @@ struct hb_coretext_aat_font_data_t {};
 hb_coretext_aat_font_data_t *
 _hb_coretext_aat_shaper_font_data_create (hb_font_t *font)
 {
-  return hb_coretext_shaper_font_data_ensure (font) ? (hb_coretext_aat_font_data_t *) HB_SHAPER_DATA_SUCCEEDED : nullptr;
+  return font->data.coretext ? (hb_coretext_aat_font_data_t *) HB_SHAPER_DATA_SUCCEEDED : nullptr;
 }
 
 void
 _hb_coretext_aat_shaper_font_data_destroy (hb_coretext_aat_font_data_t *data HB_UNUSED)
-{
-}
-
-
-/*
- * shaper shape_plan data
- */
-
-struct hb_coretext_aat_shape_plan_data_t {};
-
-hb_coretext_aat_shape_plan_data_t *
-_hb_coretext_aat_shaper_shape_plan_data_create (hb_shape_plan_t    *shape_plan HB_UNUSED,
-					     const hb_feature_t *user_features HB_UNUSED,
-					     unsigned int        num_user_features HB_UNUSED,
-					     const int          *coords HB_UNUSED,
-					     unsigned int        num_coords HB_UNUSED)
-{
-  return (hb_coretext_aat_shape_plan_data_t *) HB_SHAPER_DATA_SUCCEEDED;
-}
-
-void
-_hb_coretext_aat_shaper_shape_plan_data_destroy (hb_coretext_aat_shape_plan_data_t *data HB_UNUSED)
 {
 }
 
