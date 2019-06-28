@@ -51,7 +51,7 @@
 //############################################################
 //   build the harfbuzz shared library
 //
-cc_library_shared {
+cc_library {
     name: "libharfbuzz_ng",
     host_supported: true,
     arch: {
