@@ -108,16 +108,11 @@ cc_library {
     target: {
         android: {
             shared_libs: [
-                "libandroidicu",
                 "libcutils",
                 "libutils",
             ],
         },
         host: {
-            shared_libs: [
-                "libicui18n",
-                "libicuuc",
-            ],
             static_libs: [
                 "libcutils",
                 "libutils",
@@ -129,6 +124,7 @@ cc_library {
     },
 
     shared_libs: [
+        "libicu",
         "liblog",
     ],
 
