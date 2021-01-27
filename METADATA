@@ -1,3 +1,6 @@
 third_party {
-  license_type: NOTICE
+  # would be NOTICE save for:
+  #   m4/ax_code_coverage.m4
+  #   test/shaping/texts/in-house/shaper-arabic/script-arabic/language-urdu/crulp/ligatures/LICENSE
+  license_type: RESTRICTED
 }
