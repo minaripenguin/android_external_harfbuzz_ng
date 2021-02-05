@@ -198,6 +198,8 @@ cc_library {
         "-DHAVE_OT",
         "-DHAVE_ICU",
         "-DHAVE_ICU_BUILTIN",
+        "-DHB_LEAN",
+        "-DHAVE_CONFIG_OVERRIDE_H",
         "-Werror",
         "-Wno-unused-parameter",
         "-Wno-missing-field-initializers",
