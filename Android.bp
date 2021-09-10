@@ -181,6 +181,7 @@ cc_library {
 
     export_include_dirs: ["src"],
     cflags: [
+        "-DHB_NO_PRAGMA_GCC_DIAGNOSTIC",
         "-DHAVE_INTEL_ATOMIC_PRIMITIVES",
         "-DHAVE_OT",
         "-DHAVE_ICU",
