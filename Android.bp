@@ -200,4 +200,5 @@ cc_library {
     lto: {
         thin: true,
     },
+    whole_program_vtables: true, // Requires LTO
 }
