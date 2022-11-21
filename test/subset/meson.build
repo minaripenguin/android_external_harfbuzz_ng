@@ -33,7 +33,6 @@ tests = [
   'layout.duplicate_features',
   'layout.unsorted_featurelist',
   'layout.drop_feature',
-  'layout.default_features',
   'cmap',
   'cmap14',
   'sbix',
@@ -50,6 +49,11 @@ tests = [
   'glyph_names',
   'post',
   '32bit_var_store',
+# instacing tests, enable when --instance is not experimental
+# 'pin_all_at_default',
+# 'instantiate_glyf',
+# 'full_instance',
+# 'instance_feature_variations',
 ]
 
 repack_tests = [

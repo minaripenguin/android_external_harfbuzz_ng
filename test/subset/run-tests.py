@@ -52,12 +52,12 @@ def run_test (test, should_check_ots):
 	cli_args = ["--font-file=" + test.font_path,
 		    "--output-file=" + out_file,
 		    "--unicodes=%s" % test.unicodes (),
+		    "--preprocess-face",
 		    "--drop-tables+=DSIG",
 		    "--drop-tables-=sbix"]
 	cli_args.extend (test.get_profile_flags ())
 	if test.get_instance_flags ():
-		cli_args.extend (["--drop-tables+=GPOS,GDEF",
-				  "--instance=%s" % ','.join(test.get_instance_flags ())])
+		cli_args.extend (["--instance=%s" % ','.join(test.get_instance_flags ())])
 	ret = subset_cmd (cli_args)
 
 	if ret != "success":
