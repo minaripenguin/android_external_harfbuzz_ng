@@ -25,17 +25,21 @@ tests = [
   'layout.gdef.glyphset',
   'layout.khmer',
   'layout.context',
+  'layout.context_format2',
   'layout.gdef-varstore',
   'layout.gdef-attachlist',
   'layout.notonastaliqurdu',
   'layout.tinos',
   'layout.duplicate_features',
   'layout.unsorted_featurelist',
+  'layout.drop_feature',
   'cmap',
   'cmap14',
   'sbix',
   'colr',
+  'colr_glyphs',
   'math',
+  'math_coverage_offset',
 # TODO: re-enable once colrv1 subsetting is stabilized.
 # 'colrv1.notoemoji',
   'colrv1',
@@ -43,6 +47,13 @@ tests = [
   'cbdt',
   'variable',
   'glyph_names',
+  'post',
+  '32bit_var_store',
+# instacing tests, enable when --instance is not experimental
+# 'pin_all_at_default',
+# 'instantiate_glyf',
+# 'full_instance',
+# 'instance_feature_variations',
 ]
 
 repack_tests = [
@@ -63,12 +74,12 @@ foreach t : tests
   test(t, run_test,
     args: [
       hb_subset,
-      join_paths(meson.current_source_dir(), 'data', 'tests', fname),
+      meson.current_source_dir() / 'data' / 'tests' / fname,
     ],
     # as the tests are ran concurrently let's raise acceptable time here
     # ideally better to break and let meson handles them in parallel
     timeout: 500,
-    workdir: join_paths(meson.current_build_dir(), '..', '..'),
+    workdir: meson.current_build_dir() / '..' / '..',
     suite: 'subset',
   )
 endforeach
@@ -81,9 +92,9 @@ foreach t : repack_tests
   test(t, run_repack_test,
     args: [
       hb_subset,
-      join_paths(meson.current_source_dir(), 'data', 'repack_tests', fname),
+      meson.current_source_dir() / 'data' / 'repack_tests' / fname,
     ],
-    workdir: join_paths(meson.current_build_dir(), '..', '..'),
+    workdir: meson.current_build_dir() / '..' / '..',
     suite: ['subset', 'repack'],
   )
 endforeach
