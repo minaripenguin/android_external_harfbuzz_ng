@@ -49,7 +49,7 @@ struct Coverage
   HBUINT16                      format;         /* Format identifier */
   CoverageFormat1_3<SmallTypes> format1;
   CoverageFormat2_4<SmallTypes> format2;
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
   CoverageFormat1_3<MediumTypes>format3;
   CoverageFormat2_4<MediumTypes>format4;
 #endif
@@ -65,7 +65,7 @@ struct Coverage
     {
     case 1: return_trace (u.format1.sanitize (c));
     case 2: return_trace (u.format2.sanitize (c));
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     case 3: return_trace (u.format3.sanitize (c));
     case 4: return_trace (u.format4.sanitize (c));
 #endif
@@ -74,8 +74,10 @@ struct Coverage
   }
 
   /* Has interface. */
-  unsigned operator [] (hb_codepoint_t k) const { return get (k); }
-  bool has (hb_codepoint_t k) const { return (*this)[k] != NOT_COVERED; }
+  static constexpr unsigned SENTINEL = NOT_COVERED;
+  typedef unsigned int value_t;
+  value_t operator [] (hb_codepoint_t k) const { return get (k); }
+  bool has (hb_codepoint_t k) const { return (*this)[k] != SENTINEL; }
   /* Predicate. */
   bool operator () (hb_codepoint_t k) const { return has (k); }
 
@@ -85,7 +87,7 @@ struct Coverage
     switch (u.format) {
     case 1: return u.format1.get_coverage (glyph_id);
     case 2: return u.format2.get_coverage (glyph_id);
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     case 3: return u.format3.get_coverage (glyph_id);
     case 4: return u.format4.get_coverage (glyph_id);
 #endif
@@ -98,7 +100,7 @@ struct Coverage
     switch (u.format) {
     case 1: return u.format1.get_population ();
     case 2: return u.format2.get_population ();
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     case 3: return u.format3.get_population ();
     case 4: return u.format4.get_population ();
 #endif
@@ -125,7 +127,7 @@ struct Coverage
     }
     u.format = count <= num_ranges * 3 ? 1 : 2;
 
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     if (count && last > 0xFFFFu)
       u.format += 2;
 #endif
@@ -134,7 +136,7 @@ struct Coverage
     {
     case 1: return_trace (u.format1.serialize (c, glyphs));
     case 2: return_trace (u.format2.serialize (c, glyphs));
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     case 3: return_trace (u.format3.serialize (c, glyphs));
     case 4: return_trace (u.format4.serialize (c, glyphs));
 #endif
@@ -164,7 +166,7 @@ struct Coverage
     {
     case 1: return u.format1.intersects (glyphs);
     case 2: return u.format2.intersects (glyphs);
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     case 3: return u.format3.intersects (glyphs);
     case 4: return u.format4.intersects (glyphs);
 #endif
@@ -177,7 +179,7 @@ struct Coverage
     {
     case 1: return u.format1.intersects_coverage (glyphs, index);
     case 2: return u.format2.intersects_coverage (glyphs, index);
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     case 3: return u.format3.intersects_coverage (glyphs, index);
     case 4: return u.format4.intersects_coverage (glyphs, index);
 #endif
@@ -194,7 +196,7 @@ struct Coverage
     {
     case 1: return u.format1.collect_coverage (glyphs);
     case 2: return u.format2.collect_coverage (glyphs);
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     case 3: return u.format3.collect_coverage (glyphs);
     case 4: return u.format4.collect_coverage (glyphs);
 #endif
@@ -210,7 +212,7 @@ struct Coverage
     {
     case 1: return u.format1.intersect_set (glyphs, intersect_glyphs);
     case 2: return u.format2.intersect_set (glyphs, intersect_glyphs);
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     case 3: return u.format3.intersect_set (glyphs, intersect_glyphs);
     case 4: return u.format4.intersect_set (glyphs, intersect_glyphs);
 #endif
@@ -223,13 +225,13 @@ struct Coverage
     static constexpr bool is_sorted_iterator = true;
     iter_t (const Coverage &c_ = Null (Coverage))
     {
-      hb_memset (this, 0, sizeof (*this));
+      memset (this, 0, sizeof (*this));
       format = c_.u.format;
       switch (format)
       {
       case 1: u.format1.init (c_.u.format1); return;
       case 2: u.format2.init (c_.u.format2); return;
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
       case 3: u.format3.init (c_.u.format3); return;
       case 4: u.format4.init (c_.u.format4); return;
 #endif
@@ -242,7 +244,7 @@ struct Coverage
       {
       case 1: return u.format1.__more__ ();
       case 2: return u.format2.__more__ ();
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
       case 3: return u.format3.__more__ ();
       case 4: return u.format4.__more__ ();
 #endif
@@ -255,7 +257,7 @@ struct Coverage
       {
       case 1: u.format1.__next__ (); break;
       case 2: u.format2.__next__ (); break;
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
       case 3: u.format3.__next__ (); break;
       case 4: u.format4.__next__ (); break;
 #endif
@@ -271,7 +273,7 @@ struct Coverage
       {
       case 1: return u.format1.get_glyph ();
       case 2: return u.format2.get_glyph ();
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
       case 3: return u.format3.get_glyph ();
       case 4: return u.format4.get_glyph ();
 #endif
@@ -285,7 +287,7 @@ struct Coverage
       {
       case 1: return u.format1 != o.u.format1;
       case 2: return u.format2 != o.u.format2;
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
       case 3: return u.format3 != o.u.format3;
       case 4: return u.format4 != o.u.format4;
 #endif
@@ -300,7 +302,7 @@ struct Coverage
       {
       case 1: it.u.format1 = u.format1.__end__ (); break;
       case 2: it.u.format2 = u.format2.__end__ (); break;
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
       case 3: it.u.format3 = u.format3.__end__ (); break;
       case 4: it.u.format4 = u.format4.__end__ (); break;
 #endif
@@ -312,7 +314,7 @@ struct Coverage
     private:
     unsigned int format;
     union {
-#ifndef HB_NO_BEYOND_64K
+#ifndef HB_NO_BORING_EXPANSION
     CoverageFormat2_4<MediumTypes>::iter_t      format4; /* Put this one first since it's larger; helps shut up compiler. */
     CoverageFormat1_3<MediumTypes>::iter_t      format3;
 #endif

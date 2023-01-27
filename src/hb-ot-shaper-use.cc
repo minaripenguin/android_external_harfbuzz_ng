@@ -89,19 +89,19 @@ use_other_features[] =
   HB_TAG('p','s','t','s'),
 };
 
-static bool
+static void
 setup_syllables_use (const hb_ot_shape_plan_t *plan,
 		     hb_font_t *font,
 		     hb_buffer_t *buffer);
-static bool
+static void
 record_rphf_use (const hb_ot_shape_plan_t *plan,
 		 hb_font_t *font,
 		 hb_buffer_t *buffer);
-static bool
+static void
 record_pref_use (const hb_ot_shape_plan_t *plan,
 		 hb_font_t *font,
 		 hb_buffer_t *buffer);
-static bool
+static void
 reorder_use (const hb_ot_shape_plan_t *plan,
 	     hb_font_t *font,
 	     hb_buffer_t *buffer);
@@ -293,7 +293,7 @@ setup_topographical_masks (const hb_ot_shape_plan_t *plan,
   }
 }
 
-static bool
+static void
 setup_syllables_use (const hb_ot_shape_plan_t *plan,
 		     hb_font_t *font HB_UNUSED,
 		     hb_buffer_t *buffer)
@@ -304,10 +304,9 @@ setup_syllables_use (const hb_ot_shape_plan_t *plan,
     buffer->unsafe_to_break (start, end);
   setup_rphf_mask (plan, buffer);
   setup_topographical_masks (plan, buffer);
-  return false;
 }
 
-static bool
+static void
 record_rphf_use (const hb_ot_shape_plan_t *plan,
 		 hb_font_t *font HB_UNUSED,
 		 hb_buffer_t *buffer)
@@ -315,7 +314,7 @@ record_rphf_use (const hb_ot_shape_plan_t *plan,
   const use_shape_plan_t *use_plan = (const use_shape_plan_t *) plan->data;
 
   hb_mask_t mask = use_plan->rphf_mask;
-  if (!mask) return false;
+  if (!mask) return;
   hb_glyph_info_t *info = buffer->info;
 
   foreach_syllable (buffer, start, end)
@@ -328,10 +327,9 @@ record_rphf_use (const hb_ot_shape_plan_t *plan,
 	break;
       }
   }
-  return false;
 }
 
-static bool
+static void
 record_pref_use (const hb_ot_shape_plan_t *plan HB_UNUSED,
 		 hb_font_t *font HB_UNUSED,
 		 hb_buffer_t *buffer)
@@ -348,7 +346,6 @@ record_pref_use (const hb_ot_shape_plan_t *plan HB_UNUSED,
 	break;
       }
   }
-  return false;
 }
 
 static inline bool
@@ -441,19 +438,17 @@ reorder_syllable_use (hb_buffer_t *buffer, unsigned int start, unsigned int end)
   }
 }
 
-static bool
+static void
 reorder_use (const hb_ot_shape_plan_t *plan,
 	     hb_font_t *font,
 	     hb_buffer_t *buffer)
 {
-  bool ret = false;
   if (buffer->message (font, "start reordering USE"))
   {
-    if (hb_syllabic_insert_dotted_circles (font, buffer,
-					   use_broken_cluster,
-					   USE(B),
-					   USE(R)))
-      ret = true;
+    hb_syllabic_insert_dotted_circles (font, buffer,
+				       use_broken_cluster,
+				       USE(B),
+				       USE(R));
 
     foreach_syllable (buffer, start, end)
       reorder_syllable_use (buffer, start, end);
@@ -462,8 +457,6 @@ reorder_use (const hb_ot_shape_plan_t *plan,
   }
 
   HB_BUFFER_DEALLOCATE_VAR (buffer, use_category);
-
-  return ret;
 }
 
 

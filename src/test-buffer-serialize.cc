@@ -43,8 +43,10 @@ main (int argc, char **argv)
 
 #ifndef HB_NO_BUFFER_SERIALIZE
 
-  if (argc < 2)
-    argv[1] = (char *) "/dev/null";
+  if (argc != 2) {
+    fprintf (stderr, "usage: %s font-file\n", argv[0]);
+    exit (1);
+  }
 
   hb_blob_t *blob = hb_blob_create_from_file_or_fail (argv[1]);
   assert (blob);
@@ -56,7 +58,7 @@ main (int argc, char **argv)
   hb_font_t *font = hb_font_create (face);
   hb_face_destroy (face);
   hb_font_set_scale (font, upem, upem);
-  //hb_ot_font_set_funcs (font);
+  hb_ot_font_set_funcs (font);
 #ifdef HAVE_FREETYPE
   //hb_ft_font_set_funcs (font);
 #endif

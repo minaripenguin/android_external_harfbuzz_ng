@@ -34,7 +34,11 @@
 
 static hb_face_t* preprocess_face(hb_face_t* face)
 {
+  #ifdef HB_EXPERIMENTAL_API
   return hb_subset_preprocess (face);
+  #else
+  return hb_face_reference(face);
+  #endif
 }
 
 /*
@@ -116,7 +120,7 @@ struct subset_main_t : option_parser_t, face_options_t, output_options_t<false>
     for (unsigned i = 0; i < num_iterations; i++)
     {
       hb_face_destroy (new_face);
-      new_face = hb_subset_or_fail (orig_face, input);
+      new_face = hb_subset_or_fail (face, input);
     }
 
     bool success = new_face;
@@ -660,6 +664,7 @@ parse_drop_tables (const char *name,
   return true;
 }
 
+#ifdef HB_EXPERIMENTAL_API
 #ifndef HB_NO_VAR
 static gboolean
 parse_instance (const char *name,
@@ -723,6 +728,7 @@ parse_instance (const char *name,
 
   return true;
 }
+#endif
 #endif
 
 template <GOptionArgFunc line_parser, bool allow_comments=true>
@@ -834,7 +840,7 @@ subset_main_t::add_options ()
 
   GOptionEntry glyphset_entries[] =
   {
-    {"gids",		'g', 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_gids,
+    {"gids",		0, 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_gids,
      "Specify glyph IDs or ranges to include in the subset.\n"
      "                                                       "
      "Use --gids-=... to subtract codepoints from the current set.", "list of glyph indices/ranges or *"},
@@ -848,13 +854,13 @@ subset_main_t::add_options ()
 
     {"glyphs-file",	0, 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_file_for<parse_glyphs>,	"Specify file to read glyph names from", "filename"},
 
-    {"text",		't', 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_text,			"Specify text to include in the subset. Use --text-=... to subtract codepoints from the current set.", "string"},
+    {"text",		0, 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_text,			"Specify text to include in the subset. Use --text-=... to subtract codepoints from the current set.", "string"},
     {"text-",		0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_CALLBACK, (gpointer) &parse_text,			"Specify text to remove from the subset", "string"},
     {"text+",		0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_CALLBACK, (gpointer) &parse_text,			"Specify text to include in the subset", "string"},
 
 
     {"text-file",	0, 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_file_for<parse_text, false>,"Specify file to read text from", "filename"},
-    {"unicodes",	'u', 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_unicodes,
+    {"unicodes",	0, 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_unicodes,
      "Specify Unicode codepoints or ranges to include in the subset. Use * to include all codepoints.\n"
      "                                                       "
      "--unicodes-=... can be used to subtract codepoints from the current set.\n"
@@ -895,6 +901,7 @@ subset_main_t::add_options ()
     {"drop-tables",	0, 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_drop_tables,	"Drop the specified tables. Use --drop-tables-=... to subtract from the current set.", "list of string table tags or *"},
     {"drop-tables+",	0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_CALLBACK, (gpointer) &parse_drop_tables,	"Drop the specified tables.", "list of string table tags or *"},
     {"drop-tables-",	0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_CALLBACK, (gpointer) &parse_drop_tables,	"Drop the specified tables.", "list of string table tags or *"},
+#ifdef HB_EXPERIMENTAL_API
 #ifndef HB_NO_VAR
     {"instance",	0, 0, G_OPTION_ARG_CALLBACK, (gpointer) &parse_instance,
      "(Partially|Fully) Instantiate a variable font. A location consists of the tag of a variation axis, followed by '=', followed by a\n"
@@ -903,6 +910,7 @@ subset_main_t::add_options ()
      "For example: --instance=\"wdth=100 wght=200\" or --instance=\"wdth=drop\"\n"
      "Note: currently only fully instancing to the default location is supported\n",
      "list of comma separated axis-locations"},
+#endif
 #endif
     {nullptr}
   };

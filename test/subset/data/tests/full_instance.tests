@@ -3,7 +3,6 @@ Roboto-Variable.ttf
 
 PROFILES:
 default.txt
-no-prune-unicode-ranges.txt
 
 SUBSETS:
 *

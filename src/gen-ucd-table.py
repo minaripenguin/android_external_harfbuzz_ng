@@ -25,27 +25,13 @@ hb_common_h = 'hb-common.h' if len (sys.argv) < 3 else sys.argv[2]
 
 logging.info('Preparing data tables...')
 
-
-# This is how the data is encoded:
-#
-# General_Category (gc), Canonical_Combining_Class (ccc),
-# and Script (sc) are encoded as integers.
-#
-# Mirroring character (bmg) is encoded as difference from
-# the original character.
-#
-# Composition & Decomposition (dm) are encoded elaborately,
-# as discussed below.
-
 gc = [u['gc'] for u in ucd]
 ccc = [int(u['ccc']) for u in ucd]
 bmg = [int(v, 16) - int(u) if v else 0 for u,v in enumerate(u['bmg'] for u in ucd)]
+#gc_ccc_non0 = set((cat,klass) for cat,klass in zip(gc,ccc) if klass)
+#gc_bmg_non0 = set((cat,mirr) for cat,mirr in zip(gc, bmg) if mirr)
+
 sc = [u['sc'] for u in ucd]
-
-
-# Prepare Compose / Decompose data
-#
-# This code is very dense.  See hb_ucd_compose() / hb_ucd_decompose() for the logic.
 
 dm = {i:tuple(int(v, 16) for v in u['dm'].split()) for i,u in enumerate(ucd)
       if u['dm'] != '#' and u['dt'] == 'can' and not (0xAC00 <= i < 0xAC00+11172)}
@@ -77,9 +63,6 @@ dm_order = {None: 0}
 dm_order.update(dm1_order)
 dm_order.update(dm2_order)
 
-
-# Prepare General_Category / Script mapping arrays
-
 gc_order = dict()
 for i,v in enumerate(('Cc', 'Cf', 'Cn', 'Co', 'Cs', 'Ll', 'Lm', 'Lo', 'Lt', 'Lu',
                       'Mc', 'Me', 'Mn', 'Nd', 'Nl', 'No', 'Pc', 'Pd', 'Pe', 'Pf',
@@ -100,18 +83,10 @@ for line in open(hb_common_h):
     sc_order[i] = tag
     sc_array.append(name)
 
+DEFAULT = 3
+COMPACT = 5
+SLOPPY  = 9
 
-# Write out main data
-
-DEFAULT = 'DEFAULT'
-COMPACT = 'COMPACT'
-SLOPPY  = 'SLOPPY'
-
-compression_level = {
-    DEFAULT: 5,
-    COMPACT: 9,
-    SLOPPY:  9,
-}
 
 logging.info('Generating output...')
 print("/* == Start of generated table == */")
@@ -129,9 +104,6 @@ print()
 print('#include "hb.hh"')
 print()
 
-
-# Write mapping data
-
 code = packTab.Code('_hb_ucd')
 sc_array, _ = code.addArray('hb_script_t', 'sc_map', sc_array)
 dm1_p0_array, _ = code.addArray('uint16_t', 'dm1_p0_map', dm1_p0_array)
@@ -148,24 +120,18 @@ datasets = [
     ('dm', dm, None, dm_order),
 ]
 
-
-# Write main data
-
-for step in (DEFAULT, COMPACT, SLOPPY):
-    compression = compression_level[step]
+for compression in (DEFAULT, COMPACT, SLOPPY):
     logging.info('  Compression=%d:' % compression)
     print()
-    if step == DEFAULT:
+    if compression == DEFAULT:
         print('#ifndef HB_OPTIMIZE_SIZE')
-    elif step == COMPACT:
+    elif compression == COMPACT:
         print('#elif !defined(HB_NO_UCD_UNASSIGNED)')
-    elif step == SLOPPY:
-        print('#else')
     else:
-        assert False
+        print('#else')
     print()
 
-    if step == SLOPPY:
+    if compression == SLOPPY:
         for i in range(len(gc)):
             if (i % 128) and gc[i] == 'Cn':
                 gc[i] = gc[i - 1]
@@ -190,7 +156,6 @@ for step in (DEFAULT, COMPACT, SLOPPY):
     code.print_c(linkage='static inline')
 
     print()
-
 
 print('#endif')
 print()
