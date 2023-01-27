@@ -175,7 +175,7 @@ struct Encoding
     unsigned int size = src.get_size ();
     Encoding *dest = c->allocate_size<Encoding> (size);
     if (unlikely (!dest)) return_trace (false);
-    hb_memcpy (dest, &src, size);
+    memcpy (dest, &src, size);
     return_trace (true);
   }
 
@@ -471,7 +471,7 @@ struct Charset
     unsigned int size = src.get_size (num_glyphs);
     Charset *dest = c->allocate_size<Charset> (size);
     if (unlikely (!dest)) return_trace (false);
-    hb_memcpy (dest, &src, size);
+    memcpy (dest, &src, size);
     return_trace (true);
   }
 
@@ -617,6 +617,7 @@ struct CFF1StringIndex : CFF1Index
     }
 
     byte_str_array_t bytesArray;
+    bytesArray.init ();
     if (!bytesArray.resize (sidmap.get_population ()))
       return_trace (false);
     for (unsigned int i = 0; i < strings.count; i++)
@@ -627,6 +628,7 @@ struct CFF1StringIndex : CFF1Index
     }
 
     bool result = CFF1Index::serialize (c, bytesArray);
+    bytesArray.fini ();
     return_trace (result);
   }
 };
@@ -811,7 +813,7 @@ struct cff1_top_dict_opset_t : top_dict_opset_t<cff1_top_dict_val_t>
 	break;
 
       default:
-	env.last_offset = env.str_ref.get_offset ();
+	env.last_offset = env.str_ref.offset;
 	top_dict_opset_t<cff1_top_dict_val_t>::process_op (op, env, dictval);
 	/* Record this operand below if stack is empty, otherwise done */
 	if (!env.argStack.is_empty ()) return;
@@ -1293,10 +1295,10 @@ struct cff1
     }
 
     protected:
+    hb_blob_t	           *blob = nullptr;
     hb_sanitize_context_t   sc;
 
     public:
-    hb_blob_t               *blob = nullptr;
     const Encoding	    *encoding = nullptr;
     const Charset	    *charset = nullptr;
     const CFF1NameIndex     *nameIndex = nullptr;

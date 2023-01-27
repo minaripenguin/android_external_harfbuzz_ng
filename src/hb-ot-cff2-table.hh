@@ -56,7 +56,7 @@ struct CFF2FDSelect
     unsigned int size = src.get_size (num_glyphs);
     CFF2FDSelect *dest = c->allocate_size<CFF2FDSelect> (size);
     if (unlikely (!dest)) return_trace (false);
-    hb_memcpy (dest, &src, size);
+    memcpy (dest, &src, size);
     return_trace (true);
   }
 
@@ -124,7 +124,7 @@ struct CFF2VariationStore
     unsigned int size_ = varStore->get_size ();
     CFF2VariationStore *dest = c->allocate_size<CFF2VariationStore> (size_);
     if (unlikely (!dest)) return_trace (false);
-    hb_memcpy (dest, varStore, size_);
+    memcpy (dest, varStore, size_);
     return_trace (true);
   }
 
@@ -483,18 +483,13 @@ struct cff2
       blob = nullptr;
     }
 
-    hb_map_t *create_glyph_to_sid_map () const
-    {
-      return nullptr;
-    }
-
     bool is_valid () const { return blob; }
 
     protected:
+    hb_blob_t			*blob = nullptr;
     hb_sanitize_context_t	sc;
 
     public:
-    hb_blob_t			*blob = nullptr;
     cff2_top_dict_values_t	topDict;
     const CFF2Subrs		*globalSubrs = nullptr;
     const CFF2VariationStore	*varStore = nullptr;

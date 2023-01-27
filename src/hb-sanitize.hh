@@ -198,11 +198,10 @@ struct hb_sanitize_context_t :
   void start_processing ()
   {
     reset_object ();
-    unsigned m;
-    if (unlikely (hb_unsigned_mul_overflows (this->end - this->start, HB_SANITIZE_MAX_OPS_FACTOR, &m)))
+    if (unlikely (hb_unsigned_mul_overflows (this->end - this->start, HB_SANITIZE_MAX_OPS_FACTOR)))
       this->max_ops = HB_SANITIZE_MAX_OPS_MAX;
     else
-      this->max_ops = hb_clamp (m,
+      this->max_ops = hb_clamp ((unsigned) (this->end - this->start) * HB_SANITIZE_MAX_OPS_FACTOR,
 				(unsigned) HB_SANITIZE_MAX_OPS_MIN,
 				(unsigned) HB_SANITIZE_MAX_OPS_MAX);
     this->edit_count = 0;
@@ -253,9 +252,8 @@ struct hb_sanitize_context_t :
 		    unsigned int a,
 		    unsigned int b) const
   {
-    unsigned m;
-    return !hb_unsigned_mul_overflows (a, b, &m) &&
-	   this->check_range (base, m);
+    return !hb_unsigned_mul_overflows (a, b) &&
+	   this->check_range (base, a * b);
   }
 
   template <typename T>
@@ -264,9 +262,8 @@ struct hb_sanitize_context_t :
 		    unsigned int b,
 		    unsigned int c) const
   {
-    unsigned m;
-    return !hb_unsigned_mul_overflows (a, b, &m) &&
-	   this->check_range (base, m, c);
+    return !hb_unsigned_mul_overflows (a, b) &&
+	   this->check_range (base, a * b, c);
   }
 
   template <typename T>

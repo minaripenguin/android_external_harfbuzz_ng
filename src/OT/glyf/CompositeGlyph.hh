@@ -3,7 +3,6 @@
 
 
 #include "../../hb-open-type.hh"
-#include "composite-iter.hh"
 
 
 namespace OT {
@@ -122,7 +121,7 @@ struct CompositeGlyphRecord
     if (flags & ARG_1_AND_2_ARE_WORDS)
     {
       // no overflow, copy and update value with deltas
-      hb_memcpy (out, this, len);
+      memcpy (out, this, len);
 
       const HBINT16 *px = reinterpret_cast<const HBINT16 *> (p);
       HBINT16 *o = reinterpret_cast<HBINT16 *> (out + len_before_val);
@@ -136,7 +135,7 @@ struct CompositeGlyphRecord
       if (new_x <= 127 && new_x >= -128 &&
           new_y <= 127 && new_y >= -128)
       {
-        hb_memcpy (out, this, len);
+        memcpy (out, this, len);
         HBINT8 *o = reinterpret_cast<HBINT8 *> (out + len_before_val);
         o[0] = new_x;
         o[1] = new_y;
@@ -144,7 +143,7 @@ struct CompositeGlyphRecord
       else
       {
         // int8 overflows after deltas applied
-        hb_memcpy (out, this, len_before_val);
+        memcpy (out, this, len_before_val);
         
         //update flags
         CompositeGlyphRecord *o = reinterpret_cast<CompositeGlyphRecord *> (out);
@@ -153,14 +152,14 @@ struct CompositeGlyphRecord
 
         HBINT16 new_value;
         new_value = new_x;
-        hb_memcpy (out, &new_value, HBINT16::static_size);
+        memcpy (out, &new_value, HBINT16::static_size);
         out += HBINT16::static_size;
 
         new_value = new_y;
-        hb_memcpy (out, &new_value, HBINT16::static_size);
+        memcpy (out, &new_value, HBINT16::static_size);
         out += HBINT16::static_size;
 
-        hb_memcpy (out, p+2, len - len_before_val - 2);
+        memcpy (out, p+2, len - len_before_val - 2);
         len += 2;
       }
     }
@@ -253,7 +252,55 @@ struct CompositeGlyphRecord
   DEFINE_SIZE_MIN (4);
 };
 
-using composite_iter_t = composite_iter_tmpl<CompositeGlyphRecord>;
+struct composite_iter_t : hb_iter_with_fallback_t<composite_iter_t, const CompositeGlyphRecord &>
+{
+  typedef const CompositeGlyphRecord *__item_t__;
+  composite_iter_t (hb_bytes_t glyph_, __item_t__ current_) :
+      glyph (glyph_), current (nullptr), current_size (0)
+  {
+    set_current (current_);
+  }
+
+  composite_iter_t () : glyph (hb_bytes_t ()), current (nullptr), current_size (0) {}
+
+  item_t __item__ () const { return *current; }
+  bool __more__ () const { return current; }
+  void __next__ ()
+  {
+    if (!current->has_more ()) { current = nullptr; return; }
+
+    set_current (&StructAtOffset<CompositeGlyphRecord> (current, current_size));
+  }
+  composite_iter_t __end__ () const { return composite_iter_t (); }
+  bool operator != (const composite_iter_t& o) const
+  { return current != o.current; }
+
+
+  void set_current (__item_t__ current_)
+  {
+    if (!glyph.check_range (current_, CompositeGlyphRecord::min_size))
+    {
+      current = nullptr;
+      current_size = 0;
+      return;
+    }
+    unsigned size = current_->get_size ();
+    if (!glyph.check_range (current_, size))
+    {
+      current = nullptr;
+      current_size = 0;
+      return;
+    }
+
+    current = current_;
+    current_size = size;
+  }
+
+  private:
+  hb_bytes_t glyph;
+  __item_t__ current;
+  unsigned current_size;
+};
 
 struct CompositeGlyph
 {
@@ -335,7 +382,7 @@ struct CompositeGlyph
       unsigned comp_len = component.get_size ();
       if (component.is_anchored ())
       {
-        hb_memcpy (p, &component, comp_len);
+        memcpy (p, &component, comp_len);
         p += comp_len;
       }
       else
@@ -351,7 +398,7 @@ struct CompositeGlyph
     if (source_len > source_comp_len)
     {
       unsigned instr_len = source_len - source_comp_len;
-      hb_memcpy (p, (const char *)c + source_comp_len, instr_len);
+      memcpy (p, (const char *)c + source_comp_len, instr_len);
       p += instr_len;
     }
 
