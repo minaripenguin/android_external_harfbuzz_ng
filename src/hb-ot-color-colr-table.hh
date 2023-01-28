@@ -39,7 +39,7 @@
 #define HB_OT_TAG_COLR HB_TAG('C','O','L','R')
 
 #ifndef HB_COLRV1_MAX_NESTING_LEVEL
-#define HB_COLRV1_MAX_NESTING_LEVEL	16
+#define HB_COLRV1_MAX_NESTING_LEVEL	128
 #endif
 
 namespace OT {
@@ -1603,10 +1603,7 @@ struct COLR
 				     extents,
 				     instancer))
     {
-      extents->x_bearing = font->em_scale_x (extents->x_bearing);
-      extents->y_bearing = font->em_scale_x (extents->y_bearing);
-      extents->width = font->em_scale_x (extents->width);
-      extents->height = font->em_scale_x (extents->height);
+      font->scale_glyph_extents (extents);
       return true;
     }
 
